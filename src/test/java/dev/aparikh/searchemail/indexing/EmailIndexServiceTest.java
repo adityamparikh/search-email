@@ -92,10 +92,10 @@ class EmailIndexServiceTest {
         verify(solrClient).add(captor.capture());
         
         SolrInputDocument doc = captor.getValue().get(0);
-        assertThat(doc.getFieldValue("from_addr")).isEqualTo("from@test.com");
-        assertThat(doc.getFieldValues("to_addr")).containsExactly("to@test.com");
-        assertThat(doc.getFieldValues("cc_addr")).containsExactly("cc@test.com");
-        assertThat(doc.getFieldValues("bcc_addr")).containsExactly("bcc@test.com");
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_FROM)).isEqualTo("from@test.com");
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_TO)).containsExactly("to@test.com");
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_CC)).containsExactly("cc@test.com");
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_BCC)).containsExactly("bcc@test.com");
     }
 
     @Test
@@ -108,14 +108,14 @@ class EmailIndexServiceTest {
         verify(solrClient).add(captor.capture());
         
         SolrInputDocument doc = captor.getValue().get(0);
-        assertThat(doc.getFieldValue("id")).isEqualTo("1");
-        assertThat(doc.getFieldValue("subject")).isNull();
-        assertThat(doc.getFieldValue("body")).isNull();
-        assertThat(doc.getFieldValue("from_addr")).isNull();
-        assertThat(doc.getFieldValues("to_addr")).isNull();
-        assertThat(doc.getFieldValues("cc_addr")).isNull();
-        assertThat(doc.getFieldValues("bcc_addr")).isNull();
-        assertThat(doc.getFieldValue("sent_at")).isNull();
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_ID)).isEqualTo("1");
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_SUBJECT)).isNull();
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_BODY)).isNull();
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_FROM)).isNull();
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_TO)).isNull();
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_CC)).isNull();
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_BCC)).isNull();
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_SENT_AT)).isNull();
     }
 
     @Test
@@ -130,7 +130,7 @@ class EmailIndexServiceTest {
         verify(solrClient).add(captor.capture());
         
         SolrInputDocument doc = captor.getValue().get(0);
-        assertThat(doc.getFieldValues("to_addr")).containsExactly("valid@test.com", "another@test.com");
+        assertThat(doc.getFieldValues(EmailDocument.FIELD_TO)).containsExactly("valid@test.com", "another@test.com");
     }
 
     @Test
@@ -164,12 +164,12 @@ class EmailIndexServiceTest {
     }
 
     private void verifyDocumentFields(SolrInputDocument doc, EmailDocument email) {
-        assertThat(doc.getFieldValue("id")).isEqualTo(email.id());
-        assertThat(doc.getFieldValue("subject")).isEqualTo(email.subject());
-        assertThat(doc.getFieldValue("body")).isEqualTo(email.body());
-        assertThat(doc.getFieldValue("from_addr")).isEqualTo(email.from().toLowerCase());
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_ID)).isEqualTo(email.id());
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_SUBJECT)).isEqualTo(email.subject());
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_BODY)).isEqualTo(email.body());
+        assertThat(doc.getFieldValue(EmailDocument.FIELD_FROM)).isEqualTo(email.from().toLowerCase());
         if (email.sentAt() != null) {
-            assertThat(doc.getFieldValue("sent_at")).isEqualTo(java.util.Date.from(email.sentAt()));
+            assertThat(doc.getFieldValue(EmailDocument.FIELD_SENT_AT)).isEqualTo(java.util.Date.from(email.sentAt()));
         }
     }
 }

@@ -79,14 +79,14 @@ class EmailSearchServiceIT {
         
         // Now configure the schema
         try (SolrClient core = new HttpSolrClient.Builder(solrBaseUrl() + "/" + CORE).build()) {
-            addField(core, "id", Map.of("type", "string", "stored", true, "indexed", true, "required", true));
-            addField(core, "subject", Map.of("type", "text_general", "stored", true, "indexed", true));
-            addField(core, "body", Map.of("type", "text_general", "stored", true, "indexed", true));
-            addField(core, "from_addr", Map.of("type", "string", "stored", true, "indexed", true));
-            addField(core, "to_addr", Map.of("type", "string", "stored", true, "indexed", true, "multiValued", true));
-            addField(core, "cc_addr", Map.of("type", "string", "stored", true, "indexed", true, "multiValued", true));
-            addField(core, "bcc_addr", Map.of("type", "string", "stored", true, "indexed", true, "multiValued", true));
-            addField(core, "sent_at", Map.of("type", "pdate", "stored", true, "indexed", true));
+            addField(core, EmailDocument.FIELD_ID, Map.of("type", "string", "stored", true, "indexed", true, "required", true));
+            addField(core, EmailDocument.FIELD_SUBJECT, Map.of("type", "text_general", "stored", true, "indexed", true));
+            addField(core, EmailDocument.FIELD_BODY, Map.of("type", "text_general", "stored", true, "indexed", true));
+            addField(core, EmailDocument.FIELD_FROM, Map.of("type", "string", "stored", true, "indexed", true));
+            addField(core, EmailDocument.FIELD_TO, Map.of("type", "string", "stored", true, "indexed", true, "multiValued", true));
+            addField(core, EmailDocument.FIELD_CC, Map.of("type", "string", "stored", true, "indexed", true, "multiValued", true));
+            addField(core, EmailDocument.FIELD_BCC, Map.of("type", "string", "stored", true, "indexed", true, "multiValued", true));
+            addField(core, EmailDocument.FIELD_SENT_AT, Map.of("type", "pdate", "stored", true, "indexed", true));
         }
     }
 

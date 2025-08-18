@@ -18,16 +18,6 @@ public class EmailIndexService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailIndexService.class);
 
-    // Field names in Solr schema
-    static final String FIELD_ID = "id";
-    static final String FIELD_SUBJECT = "subject";
-    static final String FIELD_BODY = "body";
-    static final String FIELD_FROM = "from_addr";
-    static final String FIELD_TO = "to_addr";
-    static final String FIELD_CC = "cc_addr";
-    static final String FIELD_BCC = "bcc_addr";
-    static final String FIELD_SENT_AT = "sent_at";
-
     private final SolrClient solr;
 
     public EmailIndexService(SolrClient solr) {
@@ -53,14 +43,14 @@ public class EmailIndexService {
 
     private SolrInputDocument toSolrDoc(EmailDocument e) {
         SolrInputDocument d = new SolrInputDocument();
-        d.addField(FIELD_ID, e.id());
-        if (e.subject() != null) d.addField(FIELD_SUBJECT, e.subject());
-        if (e.body() != null) d.addField(FIELD_BODY, e.body());
-        if (e.from() != null) d.addField(FIELD_FROM, lower(e.from()));
-        addAll(d, FIELD_TO, e.to());
-        addAll(d, FIELD_CC, e.cc());
-        addAll(d, FIELD_BCC, e.bcc());
-        if (e.sentAt() != null) d.addField(FIELD_SENT_AT, java.util.Date.from(e.sentAt()));
+        d.addField(EmailDocument.FIELD_ID, e.id());
+        if (e.subject() != null) d.addField(EmailDocument.FIELD_SUBJECT, e.subject());
+        if (e.body() != null) d.addField(EmailDocument.FIELD_BODY, e.body());
+        if (e.from() != null) d.addField(EmailDocument.FIELD_FROM, lower(e.from()));
+        addAll(d, EmailDocument.FIELD_TO, e.to());
+        addAll(d, EmailDocument.FIELD_CC, e.cc());
+        addAll(d, EmailDocument.FIELD_BCC, e.bcc());
+        if (e.sentAt() != null) d.addField(EmailDocument.FIELD_SENT_AT, java.util.Date.from(e.sentAt()));
         return d;
     }
 

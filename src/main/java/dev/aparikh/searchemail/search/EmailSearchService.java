@@ -22,19 +22,9 @@ import java.util.stream.Collectors;
 
 @Service
 @ConditionalOnBean(SolrClient.class)
-class EmailSearchService {
+public class EmailSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailSearchService.class);
-
-    // Field names in Solr schema
-    static final String FIELD_ID = "id";
-    static final String FIELD_SUBJECT = "subject";
-    static final String FIELD_BODY = "body";
-    static final String FIELD_FROM = "from_addr";
-    static final String FIELD_TO = "to_addr";
-    static final String FIELD_CC = "cc_addr";
-    static final String FIELD_BCC = "bcc_addr";
-    static final String FIELD_SENT_AT = "sent_at";
 
     private final SolrClient solr;
 
@@ -43,43 +33,59 @@ class EmailSearchService {
     }
 
 
-    List<EmailDocument> search(SearchQuery query) {
+    public List<EmailDocument> search(SearchQuery query) {
         try {
-            SolrQuery q = new SolrQuery();
-            Optional<String> participant = query.participantEmailOpt();
-
-            // Base query: use provided query or match all
-            String baseQuery = query.queryOpt().orElse("*:*");
-            q.setQuery(baseQuery);
-
-            // Time range filter
-            String start = formatInstant(query.start());
-            String end = formatInstant(query.end());
-            q.addFilterQuery(FIELD_SENT_AT + ":[" + start + " TO " + end + "]");
-
-            // Participant filter across allowed fields
-            if (participant.isPresent()) {
-                String term = ClientUtils.escapeQueryChars(participant.get().toLowerCase(Locale.ROOT));
-                List<String> fields = new ArrayList<>();
-                fields.add(FIELD_FROM);
-                fields.add(FIELD_TO);
-                fields.add(FIELD_CC);
-                // BCC allowed only if admin firm domain matches participant's domain
-                if (sameDomain(participant.get(), query.adminFirmDomain())) {
-                    fields.add(FIELD_BCC);
-                }
-                String orExpr = fields.stream()
-                        .map(f -> f + ":\"" + term + "\"")
-                        .collect(Collectors.joining(" OR "));
-                q.addFilterQuery(orExpr);
-            }
-
+            SolrQuery q = buildSolrQuery(query);
             q.setRows(100);
             QueryResponse resp = solr.query(q);
             return resp.getResults().stream().map(this::fromSolrDoc).toList();
         } catch (Exception e) {
             throw new RuntimeException("Search failed", e);
         }
+    }
+
+    public long getHitCount(SearchQuery query) {
+        try {
+            SolrQuery q = buildSolrQuery(query);
+            q.setRows(0); // We only want the count, no documents
+            QueryResponse resp = solr.query(q);
+            return resp.getResults().getNumFound();
+        } catch (Exception e) {
+            throw new RuntimeException("Hit count failed", e);
+        }
+    }
+
+    private SolrQuery buildSolrQuery(SearchQuery query) {
+        SolrQuery q = new SolrQuery();
+        Optional<String> participant = query.participantEmailOpt();
+
+        // Base query: use provided query or match all
+        String baseQuery = query.queryOpt().orElse("*:*");
+        q.setQuery(baseQuery);
+
+        // Time range filter
+        String start = formatInstant(query.start());
+        String end = formatInstant(query.end());
+        q.addFilterQuery(EmailDocument.FIELD_SENT_AT + ":[" + start + " TO " + end + "]");
+
+        // Participant filter across allowed fields
+        if (participant.isPresent()) {
+            String term = ClientUtils.escapeQueryChars(participant.get().toLowerCase(Locale.ROOT));
+            List<String> fields = new ArrayList<>();
+            fields.add(EmailDocument.FIELD_FROM);
+            fields.add(EmailDocument.FIELD_TO);
+            fields.add(EmailDocument.FIELD_CC);
+            // BCC allowed only if admin firm domain matches participant's domain
+            if (sameDomain(participant.get(), query.adminFirmDomain())) {
+                fields.add(EmailDocument.FIELD_BCC);
+            }
+            String orExpr = fields.stream()
+                    .map(f -> f + ":\"" + term + "\"")
+                    .collect(Collectors.joining(" OR "));
+            q.addFilterQuery(orExpr);
+        }
+
+        return q;
     }
 
     private static String formatInstant(Instant instant) {
@@ -101,14 +107,14 @@ class EmailSearchService {
 
     @SuppressWarnings("unchecked")
     private EmailDocument fromSolrDoc(SolrDocument d) {
-        String id = getFieldAsString(d, FIELD_ID);
-        String subject = getFieldAsString(d, FIELD_SUBJECT);
-        String body = getFieldAsString(d, FIELD_BODY);
-        String from = getFieldAsString(d, FIELD_FROM);
-        List<String> to = toList(d.getFieldValues(FIELD_TO));
-        List<String> cc = toList(d.getFieldValues(FIELD_CC));
-        List<String> bcc = toList(d.getFieldValues(FIELD_BCC));
-        Object dateObj = d.getFieldValue(FIELD_SENT_AT);
+        String id = getFieldAsString(d, EmailDocument.FIELD_ID);
+        String subject = getFieldAsString(d, EmailDocument.FIELD_SUBJECT);
+        String body = getFieldAsString(d, EmailDocument.FIELD_BODY);
+        String from = getFieldAsString(d, EmailDocument.FIELD_FROM);
+        List<String> to = toList(d.getFieldValues(EmailDocument.FIELD_TO));
+        List<String> cc = toList(d.getFieldValues(EmailDocument.FIELD_CC));
+        List<String> bcc = toList(d.getFieldValues(EmailDocument.FIELD_BCC));
+        Object dateObj = d.getFieldValue(EmailDocument.FIELD_SENT_AT);
         Instant sentAt = null;
         if (dateObj instanceof java.util.Date) {
             sentAt = ((java.util.Date) dateObj).toInstant();

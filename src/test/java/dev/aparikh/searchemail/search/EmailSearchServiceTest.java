@@ -161,14 +161,14 @@ class EmailSearchServiceTest {
     void searchConvertsDocumentsToEmailDocuments() throws Exception {
         SolrDocumentList docs = new SolrDocumentList();
         SolrDocument doc = new SolrDocument();
-        doc.setField("id", "test-id");
-        doc.setField("subject", "Test Subject");
-        doc.setField("body", "Test Body");
-        doc.setField("from_addr", "from@test.com");
-        doc.setField("to_addr", List.of("to@test.com"));
-        doc.setField("cc_addr", List.of("cc@test.com"));
-        doc.setField("bcc_addr", List.of("bcc@test.com"));
-        doc.setField("sent_at", Date.from(Instant.parse("2025-01-01T10:00:00Z")));
+        doc.setField(EmailDocument.FIELD_ID, "test-id");
+        doc.setField(EmailDocument.FIELD_SUBJECT, "Test Subject");
+        doc.setField(EmailDocument.FIELD_BODY, "Test Body");
+        doc.setField(EmailDocument.FIELD_FROM, "from@test.com");
+        doc.setField(EmailDocument.FIELD_TO, List.of("to@test.com"));
+        doc.setField(EmailDocument.FIELD_CC, List.of("cc@test.com"));
+        doc.setField(EmailDocument.FIELD_BCC, List.of("bcc@test.com"));
+        doc.setField(EmailDocument.FIELD_SENT_AT, Date.from(Instant.parse("2025-01-01T10:00:00Z")));
         docs.add(doc);
         
         when(queryResponse.getResults()).thenReturn(docs);
@@ -196,8 +196,8 @@ class EmailSearchServiceTest {
     void searchHandlesArrayListFieldValues() throws Exception {
         SolrDocumentList docs = new SolrDocumentList();
         SolrDocument doc = new SolrDocument();
-        doc.setField("id", "test-id");
-        doc.setField("subject", new ArrayList<>(List.of("Subject in ArrayList")));
+        doc.setField(EmailDocument.FIELD_ID, "test-id");
+        doc.setField(EmailDocument.FIELD_SUBJECT, new ArrayList<>(List.of("Subject in ArrayList")));
         docs.add(doc);
         
         when(queryResponse.getResults()).thenReturn(docs);
@@ -217,8 +217,8 @@ class EmailSearchServiceTest {
     void searchHandlesInstantFromString() throws Exception {
         SolrDocumentList docs = new SolrDocumentList();
         SolrDocument doc = new SolrDocument();
-        doc.setField("id", "test-id");
-        doc.setField("sent_at", "2025-01-01T10:00:00Z");
+        doc.setField(EmailDocument.FIELD_ID, "test-id");
+        doc.setField(EmailDocument.FIELD_SENT_AT, "2025-01-01T10:00:00Z");
         docs.add(doc);
         
         when(queryResponse.getResults()).thenReturn(docs);
