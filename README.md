@@ -1,95 +1,145 @@
-# Email Search Engine (SolrJ + Spring Boot)
+## Project Overview
 
-This module implements an email search engine backed by Apache Solr (via SolrJ). It indexes all typical email fields and enforces privacy protections for BCC participants at query time, based on the firm (email domain) of the searching admin.
+This is a Spring Boot 3.5.4 application implementing an email search engine backed by Apache Solr. The system provides
+privacy-aware search capabilities where BCC participants are only visible to admins from the same firm domain.
 
-## Design
+## Build and Development Commands
 
-- Storage/Search: Apache Solr core `emails` accessed through SolrJ.
-- Data model:
-  - Fields: `id`, `subject`, `body`, `from_addr`, `to_addr[]`, `cc_addr[]`, `bcc_addr[]`, `sent_at`.
-  - All participant fields store full email addresses (normalized to lower-case).
-  - `sent_at` is an Instant (UTC), stored in Solr as a date field.
-- Privacy policy:
-  - Admins can search by an email participant. Matches in TO/CC/FROM are always visible.
-  - Matches in BCC are only visible if the searched participant’s email domain equals the admin’s firm domain (assume the domain is the firm).
-  - Searches must include a start and end time; results are filtered to this range.
-- Minimal duplication:
-  - Each participant field is indexed separately; we do not store a duplicated "participants" blob. We combine across fields at query time with an OR expression.
-
-## Components
-
-- `SolrProperties` (typed config): `solr.base-url`, `solr.core`, `solr.commit-within-ms`.
-- `SolrConfig`: builds a `SolrClient` (HttpSolrClient).
-- `EmailDocument` (record): holds the email fields to index/fetch.
-- `SearchQuery` (record): holds time range, participant email, and admin firm domain; validates non-null time range and non-decreasing order.
-- `EmailSearchService`:
-  - `index()` / `indexAll()`: writes documents to Solr, normalizing email addresses to lower-case.
-  - `search(SearchQuery)`: builds a Solr query:
-    - Applies `sent_at:[start TO end]` filter.
-    - If a participantEmail is provided, adds an OR filter across `from_addr`, `to_addr`, `cc_addr` and (conditionally) `bcc_addr` only when the participant’s domain equals the admin’s firm domain.
-
-## Schema
-
-Tests create a core from the `_default` configset and add fields via Solr’s Schema API:
-
-- `id`: string, stored/indexed, required
-- `subject`: text_general
-- `body`: text_general
-- `from_addr`: string
-- `to_addr`: string, multiValued
-- `cc_addr`: string, multiValued
-- `bcc_addr`: string, multiValued
-- `sent_at`: pdate
-
-Note: Strings are used for email addresses to avoid analyzer-side changes; values are normalized to lower-case at index and query time.
-
-## Privacy Details
-
-- BCC visibility is enforced at query time only when searching by a specific participant.
-- Admin’s firm is derived from their domain string (e.g., `acme.com`). The participant’s firm is derived from the participant’s email domain.
-- This logic ensures admins see BCC results only for their own firm’s employees.
-
-## Code Organization
-
-- `dev.aparikh.searchemail.config`: configuration classes (`SolrProperties`, `SolrConfig`).
-- `dev.aparikh.searchemail.search`: search domain and service (`EmailDocument`, `SearchQuery`, `EmailSearchService`).
-- Tests: `src/test/java/dev/aparikh/searchemail/search/EmailSearchServiceIT` spin up a Solr container and verify behavior.
-
-## Spring Boot Guidelines Applied
-
-- Constructor injection, final fields wherever applicable.
-- Package-private visibility for components; only the application class is public.
-- Typed configuration with `@ConfigurationProperties`.
-- Transactions are not applicable (no RDBMS). OSIV disabled by default for safety.
-- Centralized logging via SLF4J; avoid System.out.
-- Integration tests use Testcontainers with a random web port.
-
-## Running Tests
-
-Prerequisites: Docker must be available for Testcontainers.
-
-- Linux/macOS/Windows:
-
+### Core Commands
 ```bash
+# Build the project
+./gradlew build
+
+# Run tests (requires Docker for Testcontainers)
 ./gradlew test
+
+# Run a single test class
+./gradlew test --tests "EmailSearchServiceIT"
+
+# Run the application
+./gradlew bootRun
+
+# Clean build
+./gradlew clean build
 ```
 
-The integration test spins up `solr:9.6.1`, creates the `emails` core and fields, indexes sample data, and asserts:
-- BCC matches are visible only when admin’s firm domain equals the participant’s domain.
-- TO/CC matches are always visible.
-- Date range filtering works and is mandatory.
+### Development
+
+- Uses Java 21 with Spring Boot 3.5.4
+- Gradle wrapper (./gradlew) is the preferred build tool
+- Tests use Testcontainers with Solr 9.6.1 (requires Docker)
+- Development includes Spring Boot DevTools for hot reload
+
+## Architecture
+
+### Core Components
+
+**Configuration Layer (`dev.aparikh.searchemail.config`)**:
+
+- `SolrProperties`: Typed configuration for Solr connection (`solr.*` properties)
+- `SolrConfig`: Creates HttpSolrClient bean with URL normalization
+
+**Search Domain (`dev.aparikh.searchemail.search`)**:
+
+- `EmailDocument`: Record representing email data with all fields (id, subject, body, from, to[], cc[], bcc[], sentAt)
+- `SearchQuery`: Record for search parameters with configurable query text, time range validation, and privacy context
+- `EmailIndexService`: Service responsible for indexing emails into Solr with proper field mapping and normalization
+- `EmailSearchService`: Service responsible for searching emails with privacy enforcement and configurable query
+  building
+
+### Privacy Architecture
+
+The system implements firm-based privacy controls:
+
+- TO/CC/FROM matches are always visible to any admin
+- BCC matches are only visible when the participant's email domain matches the admin's firm domain
+- All searches require mandatory time range filtering
+- Email addresses are normalized to lowercase for consistent matching
+
+### Data Flow
+
+1. **Indexing**: EmailIndexService: EmailDocument → SolrInputDocument → Solr core
+2. **Searching**: EmailSearchService: SearchQuery → SolrQuery with privacy filters → List<EmailDocument>
+3. **Privacy Enforcement**: Applied at query time via conditional BCC field inclusion
+
+### Separation of Concerns
+
+- **EmailIndexService**: Handles document transformation, field normalization (email addresses to lowercase), and Solr
+  indexing operations
+- **EmailSearchService**: Handles configurable query building, privacy rule enforcement, result parsing, and field value
+  extraction from Solr documents
+
+### Query Capabilities
+
+- **Configurable Queries**: SearchQuery accepts an optional query parameter for full-text search (defaults to "*:*" for
+  match-all)
+- **Field-Specific Search**: Supports Solr query syntax like `subject:Meeting` or `body:discuss`
+- **Combined Filtering**: Query text works alongside time range and participant filters
+
+### Solr Schema
+
+Uses dynamic field creation via Schema API in tests:
+
+- `id`: string (required, unique)
+- `subject`, `body`: text_general (analyzed)
+- `from_addr`: string (exact match)
+- `to_addr`, `cc_addr`, `bcc_addr`: string arrays (exact match, multiValued)
+- `sent_at`: pdate (date/time with range queries)
+
+## Testing Strategy
+
+### Integration Tests
+
+- `EmailSearchServiceIT`: Full integration test using Testcontainers
+- Creates real Solr instance with proper schema
+- Tests privacy enforcement, date filtering, and search accuracy
+- Includes setup/teardown for clean test isolation
+
+### Test Configuration
+
+- Uses `@DynamicPropertySource` to configure Solr connection from Testcontainers
+- `TestSearchEmailApplication` for development with Testcontainers
+- Tests require Docker and will create/destroy Solr containers
 
 ## Configuration
 
-Add to your application properties (or environment variables):
+### Application Properties
 
-- `solr.base-url=http://localhost:8983/solr`
-- `solr.core=emails`
-- `solr.commit-within-ms=0`
+```properties
+# Solr connection (disabled by default, enabled in tests)
+solr.base-url=http://localhost:8983/solr
+solr.core=emails
+solr.commit-within-ms=0
+# Production best practices
+spring.jpa.open-in-view=false
+management.endpoints.web.exposure.include=health,info,metrics
+```
 
-By default in this project, Solr is disabled unless explicitly enabled (tests enable it dynamically).
+### Conditional Bean Creation
 
-## Extensibility
+- SolrClient and EmailSearchService are only created when Solr configuration is available
+- Uses `@ConditionalOnBean(SolrClient.class)` for service activation
 
-- Add additional query criteria (subject/body text, pagination, sort) by expanding `SearchQuery` and `EmailSearchService.search`.
-- Add firm mapping strategies beyond domain matching by plugging in a resolver injected into `EmailSearchService`.
+## Development Patterns
+
+### Code Style
+
+- Package-private visibility by default (only main application class is public)
+- Constructor injection with final fields
+- Records for immutable data structures
+- Validation annotations on configuration properties
+- SLF4J logging (avoid System.out)
+
+### Error Handling
+
+- Runtime exceptions with descriptive messages for Solr operations
+- Graceful handling of missing/malformed data
+- Validation at boundaries (SearchQuery validates time range order)
+
+## Key Dependencies
+
+- Spring Boot 3.5.4 (Web, Actuator, Cache, Validation, DevTools)
+- Apache Solr SolrJ 9.6.1
+- Lombok for boilerplate reduction
+- Testcontainers for integration testing
+- JUnit 5 with AssertJ assertions
