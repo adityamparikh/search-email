@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Request DTO for email search API.
@@ -29,9 +30,9 @@ public record SearchRequest(
                 example = "subject:meeting AND body:urgent")
         String query,
 
-        @Schema(description = "Filter by participant email address", 
-                example = "user@company.com")
-        String participantEmail,
+        @Schema(description = "Filter by participant email addresses (emails involving any of these participants will be returned)", 
+                example = "[\"user1@company.com\", \"user2@company.com\"]")
+        List<String> participantEmails,
 
         @NotNull
         @Schema(description = "Admin's firm domain for BCC privacy enforcement", 

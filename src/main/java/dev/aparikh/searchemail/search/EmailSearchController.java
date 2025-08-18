@@ -36,7 +36,8 @@ public class EmailSearchController {
     @PostMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
             summary = "Search emails",
-            description = "Search for emails based on time range, participant, and optional full-text query. " +
+            description = "Search for emails based on time range, participants, and optional full-text query. " +
+                    "Returns emails involving any of the specified participants. " +
                     "BCC visibility is enforced based on admin firm domain."
     )
     @ApiResponses(value = {
@@ -107,7 +108,7 @@ public class EmailSearchController {
                 request.startTime(),
                 request.endTime(),
                 request.query(),
-                request.participantEmail(),
+                request.participantEmails(),
                 request.adminFirmDomain()
         );
     }

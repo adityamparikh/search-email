@@ -1,19 +1,20 @@
 package dev.aparikh.searchemail.search;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * Search criteria. All searches must include a time range.
  * Optional query provides full-text search terms.
- * Optional participantEmail narrows to emails involving that participant.
+ * Optional participantEmails narrows to emails involving any of those participants.
  * adminFirmDomain is used to enforce BCC privacy.
  */
 public record SearchQuery(
         Instant start,
         Instant end,
         String query,
-        String participantEmail,
+        List<String> participantEmails,
         String adminFirmDomain
 ) {
     public SearchQuery {
@@ -29,7 +30,10 @@ public record SearchQuery(
         return Optional.ofNullable(query).filter(s -> !s.isBlank());
     }
 
-    public Optional<String> participantEmailOpt() {
-        return Optional.ofNullable(participantEmail).filter(s -> !s.isBlank());
+    public List<String> participantEmailsNonEmpty() {
+        if (participantEmails == null) return List.of();
+        return participantEmails.stream()
+                .filter(email -> email != null && !email.isBlank())
+                .toList();
     }
 }

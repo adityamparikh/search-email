@@ -46,7 +46,7 @@ class EmailSearchControllerTest {
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
                 "test query",
-                "user@test.com",
+                List.of("user@test.com"),
                 "test.com"
         );
 

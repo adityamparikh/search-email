@@ -3,6 +3,7 @@ package dev.aparikh.searchemail.search;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,37 +75,44 @@ class SearchQueryTest {
     }
 
     @Test
-    void participantEmailOptReturnsEmptyForNull() {
+    void participantEmailsNonEmptyReturnsEmptyForNull() {
         var query = new SearchQuery(start, end, null, null, "domain.com");
-        assertThat(query.participantEmailOpt()).isEmpty();
+        assertThat(query.participantEmailsNonEmpty()).isEmpty();
     }
 
     @Test
-    void participantEmailOptReturnsEmptyForBlankString() {
-        var query = new SearchQuery(start, end, null, "   ", "domain.com");
-        assertThat(query.participantEmailOpt()).isEmpty();
+    void participantEmailsNonEmptyFiltersBlankStrings() {
+        var participantList = new java.util.ArrayList<String>();
+        participantList.add("alice@example.com");
+        participantList.add("   ");
+        participantList.add("");
+        participantList.add(null);
+        participantList.add("bob@example.com");
+        
+        var query = new SearchQuery(start, end, null, participantList, "domain.com");
+        assertThat(query.participantEmailsNonEmpty()).containsExactly("alice@example.com", "bob@example.com");
     }
 
     @Test
-    void participantEmailOptReturnsEmptyForEmptyString() {
-        var query = new SearchQuery(start, end, null, "", "domain.com");
-        assertThat(query.participantEmailOpt()).isEmpty();
+    void participantEmailsNonEmptyReturnsEmptyForEmptyList() {
+        var query = new SearchQuery(start, end, null, List.of(), "domain.com");
+        assertThat(query.participantEmailsNonEmpty()).isEmpty();
     }
 
     @Test
-    void participantEmailOptReturnsValueForNonBlankString() {
-        var query = new SearchQuery(start, end, null, "alice@example.com", "domain.com");
-        assertThat(query.participantEmailOpt()).hasValue("alice@example.com");
+    void participantEmailsNonEmptyReturnsValidEmails() {
+        var query = new SearchQuery(start, end, null, List.of("alice@example.com", "bob@example.com"), "domain.com");
+        assertThat(query.participantEmailsNonEmpty()).containsExactly("alice@example.com", "bob@example.com");
     }
 
     @Test
     void recordFieldsAreAccessible() {
-        var query = new SearchQuery(start, end, "test query", "user@domain.com", "domain.com");
+        var query = new SearchQuery(start, end, "test query", List.of("user@domain.com"), "domain.com");
         
         assertThat(query.start()).isEqualTo(start);
         assertThat(query.end()).isEqualTo(end);
         assertThat(query.query()).isEqualTo("test query");
-        assertThat(query.participantEmail()).isEqualTo("user@domain.com");
+        assertThat(query.participantEmails()).containsExactly("user@domain.com");
         assertThat(query.adminFirmDomain()).isEqualTo("domain.com");
     }
 }

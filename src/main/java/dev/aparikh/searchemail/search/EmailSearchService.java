@@ -57,7 +57,7 @@ public class EmailSearchService {
 
     private SolrQuery buildSolrQuery(SearchQuery query) {
         SolrQuery q = new SolrQuery();
-        Optional<String> participant = query.participantEmailOpt();
+        List<String> participants = query.participantEmailsNonEmpty();
 
         // Base query: use provided query or match all
         String baseQuery = query.queryOpt().orElse("*:*");
@@ -69,20 +69,28 @@ public class EmailSearchService {
         q.addFilterQuery(EmailDocument.FIELD_SENT_AT + ":[" + start + " TO " + end + "]");
 
         // Participant filter across allowed fields
-        if (participant.isPresent()) {
-            String term = ClientUtils.escapeQueryChars(participant.get().toLowerCase(Locale.ROOT));
-            List<String> fields = new ArrayList<>();
-            fields.add(EmailDocument.FIELD_FROM);
-            fields.add(EmailDocument.FIELD_TO);
-            fields.add(EmailDocument.FIELD_CC);
-            // BCC allowed only if admin firm domain matches participant's domain
-            if (sameDomain(participant.get(), query.adminFirmDomain())) {
-                fields.add(EmailDocument.FIELD_BCC);
+        if (!participants.isEmpty()) {
+            List<String> participantExpressions = new ArrayList<>();
+            
+            for (String participant : participants) {
+                String term = ClientUtils.escapeQueryChars(participant.toLowerCase(Locale.ROOT));
+                List<String> fields = new ArrayList<>();
+                fields.add(EmailDocument.FIELD_FROM);
+                fields.add(EmailDocument.FIELD_TO);
+                fields.add(EmailDocument.FIELD_CC);
+                // BCC allowed only if admin firm domain matches participant's domain
+                if (sameDomain(participant, query.adminFirmDomain())) {
+                    fields.add(EmailDocument.FIELD_BCC);
+                }
+                String participantExpr = fields.stream()
+                        .map(f -> f + ":\"" + term + "\"")
+                        .collect(Collectors.joining(" OR "));
+                participantExpressions.add("(" + participantExpr + ")");
             }
-            String orExpr = fields.stream()
-                    .map(f -> f + ":\"" + term + "\"")
-                    .collect(Collectors.joining(" OR "));
-            q.addFilterQuery(orExpr);
+            
+            // Combine all participant expressions with OR
+            String allParticipantsExpr = String.join(" OR ", participantExpressions);
+            q.addFilterQuery(allParticipantsExpr);
         }
 
         return q;

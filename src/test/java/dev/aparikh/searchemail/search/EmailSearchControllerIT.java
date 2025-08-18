@@ -144,7 +144,7 @@ class EmailSearchControllerIT {
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
                 null,
-                "alice@acme.com",
+                List.of("alice@acme.com"),
                 "acme.com"
         );
 
@@ -184,7 +184,7 @@ class EmailSearchControllerIT {
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
                 null,
-                "alice@acme.com",
+                List.of("alice@acme.com"),
                 "acme.com"
         );
 
@@ -295,7 +295,7 @@ class EmailSearchControllerIT {
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
                 null,
-                "alice@acme.com",
+                List.of("alice@acme.com"),
                 "acme.com"
         );
 
@@ -314,7 +314,7 @@ class EmailSearchControllerIT {
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
                 null,
-                "bob@other.com",
+                List.of("bob@other.com"),
                 "acme.com"
         );
 

@@ -141,11 +141,11 @@ class EmailSearchServiceIT {
         );
         indexService.indexAll(List.of(bccAcme, bccOther));
 
-        SearchQuery q1 = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "alice@acme.com", "acme.com");
+        SearchQuery q1 = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "alice@acme.com", "acme.com");
         List<EmailDocument> r1 = searchService.search(q1);
         assertThat(r1).extracting(EmailDocument::id).contains("1");
 
-        SearchQuery q2 = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
+        SearchQuery q2 = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
         List<EmailDocument> r2 = searchService.search(q2);
         assertThat(r2).extracting(EmailDocument::id).doesNotContain("2");
     }
@@ -163,7 +163,7 @@ class EmailSearchServiceIT {
         );
         indexService.indexAll(List.of(toDoc, ccDoc));
 
-        SearchQuery q = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
+        SearchQuery q = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
         List<EmailDocument> r = searchService.search(q);
         assertThat(r).extracting(EmailDocument::id).contains("3", "4");
     }
@@ -177,7 +177,7 @@ class EmailSearchServiceIT {
         );
         indexService.index(d);
 
-        SearchQuery q = new SearchQuery(now.plusSeconds(3600), now.plusSeconds(7200), null, "x@y.com", "y.com");
+        SearchQuery q = createSearchQuery(now.plusSeconds(3600), now.plusSeconds(7200), null, "x@y.com", "y.com");
         List<EmailDocument> r = searchService.search(q);
         assertThat(r).isEmpty();
     }
@@ -196,17 +196,17 @@ class EmailSearchServiceIT {
         indexService.indexAll(List.of(docWithMeeting, docWithUpdate));
 
         // Search for specific term in subject
-        SearchQuery meetingQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), "subject:Meeting", null, "acme.com");
+        SearchQuery meetingQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), "subject:Meeting", null, "acme.com");
         List<EmailDocument> meetingResults = searchService.search(meetingQuery);
         assertThat(meetingResults).extracting(EmailDocument::id).contains("6").doesNotContain("7");
 
         // Search for term in body
-        SearchQuery discussQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), "body:discuss", null, "acme.com");
+        SearchQuery discussQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), "body:discuss", null, "acme.com");
         List<EmailDocument> discussResults = searchService.search(discussQuery);
         assertThat(discussResults).extracting(EmailDocument::id).contains("6").doesNotContain("7");
 
         // Search with no query (match all)
-        SearchQuery allQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, null, "acme.com");
+        SearchQuery allQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, null, "acme.com");
         List<EmailDocument> allResults = searchService.search(allQuery);
         assertThat(allResults).extracting(EmailDocument::id).contains("6", "7");
     }
@@ -220,7 +220,7 @@ class EmailSearchServiceIT {
         );
         indexService.index(emailWithSpecialChars);
 
-        SearchQuery query = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "user+test@domain-name.com", "domain-name.com");
+        SearchQuery query = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "user+test@domain-name.com", "domain-name.com");
         List<EmailDocument> results = searchService.search(query);
         assertThat(results).extracting(EmailDocument::id).contains("8");
     }
@@ -235,7 +235,7 @@ class EmailSearchServiceIT {
         indexService.index(emailUpperCase);
 
         // Search using lowercase should find uppercase emails due to normalization
-        SearchQuery query = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "from@test.com", "test.com");
+        SearchQuery query = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "from@test.com", "test.com");
         List<EmailDocument> results = searchService.search(query);
         assertThat(results).extracting(EmailDocument::id).contains("9");
     }
@@ -249,9 +249,9 @@ class EmailSearchServiceIT {
         );
         indexService.index(emailMultipleTo);
 
-        SearchQuery queryAlice = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "alice@acme.com", "acme.com");
-        SearchQuery queryBob = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@acme.com", "acme.com");
-        SearchQuery queryCharlie = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "charlie@other.com", "acme.com");
+        SearchQuery queryAlice = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "alice@acme.com", "acme.com");
+        SearchQuery queryBob = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@acme.com", "acme.com");
+        SearchQuery queryCharlie = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "charlie@other.com", "acme.com");
 
         assertThat(searchService.search(queryAlice)).extracting(EmailDocument::id).contains("10");
         assertThat(searchService.search(queryBob)).extracting(EmailDocument::id).contains("10");
@@ -269,7 +269,7 @@ class EmailSearchServiceIT {
         );
         indexService.indexAll(List.of(minimalEmail, emptyListsEmail));
 
-        SearchQuery query = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, null, "test.com");
+        SearchQuery query = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, null, "test.com");
         List<EmailDocument> results = searchService.search(query);
         assertThat(results).extracting(EmailDocument::id).contains("11", "12");
     }
@@ -283,7 +283,7 @@ class EmailSearchServiceIT {
         );
         indexService.index(email);
 
-        SearchQuery blankQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), "   ", null, "test.com");
+        SearchQuery blankQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), "   ", null, "test.com");
         List<EmailDocument> results = searchService.search(blankQuery);
         assertThat(results).extracting(EmailDocument::id).contains("13");
     }
@@ -302,7 +302,7 @@ class EmailSearchServiceIT {
         indexService.indexAll(List.of(urgentMeeting, regularUpdate));
 
         // Complex query combining subject and body terms
-        SearchQuery complexQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), 
+        SearchQuery complexQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), 
                 "subject:Urgent AND body:important", null, "acme.com");
         List<EmailDocument> results = searchService.search(complexQuery);
         assertThat(results).extracting(EmailDocument::id).contains("14").doesNotContain("15");
@@ -325,7 +325,7 @@ class EmailSearchServiceIT {
         );
         indexService.indexAll(List.of(beforeRange, withinRange, afterRange));
 
-        SearchQuery query = new SearchQuery(baseTime, baseTime.plusSeconds(3600), null, null, "test.com");
+        SearchQuery query = createSearchQuery(baseTime, baseTime.plusSeconds(3600), null, null, "test.com");
         List<EmailDocument> results = searchService.search(query);
         assertThat(results).extracting(EmailDocument::id).contains("17").doesNotContain("16", "18");
     }
@@ -340,13 +340,63 @@ class EmailSearchServiceIT {
         indexService.index(email);
 
         // Admin with lowercase domain should see BCC
-        SearchQuery lowerQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "secret@domain.com", "domain.com");
+        SearchQuery lowerQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "secret@domain.com", "domain.com");
         List<EmailDocument> lowerResults = searchService.search(lowerQuery);
         assertThat(lowerResults).extracting(EmailDocument::id).contains("19");
 
         // Admin with uppercase domain should also see BCC (domain comparison should be case-insensitive)
-        SearchQuery upperQuery = new SearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "secret@domain.com", "DOMAIN.COM");
+        SearchQuery upperQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "secret@domain.com", "DOMAIN.COM");
         List<EmailDocument> upperResults = searchService.search(upperQuery);
         assertThat(upperResults).extracting(EmailDocument::id).contains("19");
+    }
+
+    @Test
+    void searchWithMultipleParticipantsReturnsEmailsForAny() {
+        Instant now = Instant.parse("2025-01-01T10:15:30Z");
+        
+        EmailDocument emailFromAlice = new EmailDocument(
+                "20", "From Alice", "Message from Alice", "alice@acme.com",
+                List.of("team@acme.com"), List.of(), List.of(), now
+        );
+        EmailDocument emailToBob = new EmailDocument(
+                "21", "To Bob", "Message to Bob", "sender@corp.com",
+                List.of("bob@acme.com"), List.of(), List.of(), now
+        );
+        EmailDocument emailCcCharlie = new EmailDocument(
+                "22", "CC Charlie", "Message with Charlie in CC", "sender@corp.com",
+                List.of("someone@corp.com"), List.of("charlie@acme.com"), List.of(), now
+        );
+        EmailDocument emailBccDave = new EmailDocument(
+                "23", "BCC Dave", "Message with Dave in BCC", "sender@corp.com",
+                List.of("someone@corp.com"), List.of(), List.of("dave@acme.com"), now
+        );
+        EmailDocument unrelatedEmail = new EmailDocument(
+                "24", "Unrelated", "Message not involving searched participants", "other@corp.com",
+                List.of("different@corp.com"), List.of(), List.of(), now
+        );
+        
+        indexService.indexAll(List.of(emailFromAlice, emailToBob, emailCcCharlie, emailBccDave, unrelatedEmail));
+
+        // Search for multiple participants
+        SearchQuery multiQuery = new SearchQuery(
+                now.minusSeconds(3600), 
+                now.plusSeconds(3600), 
+                null, 
+                List.of("alice@acme.com", "bob@acme.com", "charlie@acme.com", "dave@acme.com"), 
+                "acme.com"
+        );
+        
+        List<EmailDocument> results = searchService.search(multiQuery);
+        
+        // Should find all emails involving any of the searched participants
+        assertThat(results).extracting(EmailDocument::id)
+                .containsExactlyInAnyOrder("20", "21", "22", "23")
+                .doesNotContain("24");
+    }
+
+    // Helper method to create SearchQuery with single participant
+    private SearchQuery createSearchQuery(Instant start, Instant end, String query, String participantEmail, String adminFirmDomain) {
+        List<String> participants = participantEmail != null ? List.of(participantEmail) : null;
+        return new SearchQuery(start, end, query, participants, adminFirmDomain);
     }
 }
