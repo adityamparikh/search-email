@@ -6,7 +6,9 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -381,9 +383,11 @@ class EmailSearchServiceIT {
         SearchQuery multiQuery = new SearchQuery(
                 now.minusSeconds(3600), 
                 now.plusSeconds(3600), 
-                null, 
-                List.of("alice@acme.com", "bob@acme.com", "charlie@acme.com", "dave@acme.com"), 
-                "acme.com"
+                null,
+                List.of("alice@acme.com", "bob@acme.com", "charlie@acme.com", "dave@acme.com"),
+                "acme.com",
+                0,
+                100
         );
         
         List<EmailDocument> results = searchService.search(multiQuery);
@@ -397,6 +401,6 @@ class EmailSearchServiceIT {
     // Helper method to create SearchQuery with single participant
     private SearchQuery createSearchQuery(Instant start, Instant end, String query, String participantEmail, String adminFirmDomain) {
         List<String> participants = participantEmail != null ? List.of(participantEmail) : null;
-        return new SearchQuery(start, end, query, participants, adminFirmDomain);
+        return new SearchQuery(start, end, query, participants, adminFirmDomain, 0, 100);
     }
 }

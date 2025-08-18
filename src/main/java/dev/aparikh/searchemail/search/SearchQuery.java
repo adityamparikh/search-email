@@ -15,7 +15,9 @@ public record SearchQuery(
         Instant end,
         String query,
         List<String> participantEmails,
-        String adminFirmDomain
+        String adminFirmDomain,
+        int page,
+        int size
 ) {
     public SearchQuery {
         if (start == null || end == null) {
@@ -23,6 +25,12 @@ public record SearchQuery(
         }
         if (end.isBefore(start)) {
             throw new IllegalArgumentException("end must be >= start");
+        }
+        if (page < 0) {
+            throw new IllegalArgumentException("page must be >= 0");
+        }
+        if (size <= 0) {
+            throw new IllegalArgumentException("size must be > 0");
         }
     }
 

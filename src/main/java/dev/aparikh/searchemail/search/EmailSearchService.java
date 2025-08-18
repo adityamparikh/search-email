@@ -4,21 +4,16 @@ import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.common.SolrDocument;
 import org.apache.solr.client.solrj.util.ClientUtils;
+import org.apache.solr.common.SolrDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Service
 @ConditionalOnBean(SolrClient.class)
@@ -33,15 +28,12 @@ public class EmailSearchService {
     }
 
 
-    public List<EmailDocument> search(SearchQuery query) {
-        try {
-            SolrQuery q = buildSolrQuery(query);
-            q.setRows(100);
-            QueryResponse resp = solr.query(q);
-            return resp.getResults().stream().map(this::fromSolrDoc).toList();
-        } catch (Exception e) {
-            throw new RuntimeException("Search failed", e);
-        }
+    private static List<String> toList(Collection<?> values) {
+        if (values == null) return List.of();
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .toList();
     }
 
     public long getHitCount(SearchQuery query) {
@@ -55,45 +47,42 @@ public class EmailSearchService {
         }
     }
 
-    private SolrQuery buildSolrQuery(SearchQuery query) {
-        SolrQuery q = new SolrQuery();
-        List<String> participants = query.participantEmailsNonEmpty();
-
-        // Base query: use provided query or match all
-        String baseQuery = query.queryOpt().orElse("*:*");
-        q.setQuery(baseQuery);
-
-        // Time range filter
-        String start = formatInstant(query.start());
-        String end = formatInstant(query.end());
-        q.addFilterQuery(EmailDocument.FIELD_SENT_AT + ":[" + start + " TO " + end + "]");
-
-        // Participant filter across allowed fields
-        if (!participants.isEmpty()) {
-            List<String> participantExpressions = new ArrayList<>();
-            
-            for (String participant : participants) {
-                String term = ClientUtils.escapeQueryChars(participant.toLowerCase(Locale.ROOT));
-                List<String> fields = new ArrayList<>();
-                fields.add(EmailDocument.FIELD_FROM);
-                fields.add(EmailDocument.FIELD_TO);
-                fields.add(EmailDocument.FIELD_CC);
-                // BCC allowed only if admin firm domain matches participant's domain
-                if (sameDomain(participant, query.adminFirmDomain())) {
-                    fields.add(EmailDocument.FIELD_BCC);
-                }
-                String participantExpr = fields.stream()
-                        .map(f -> f + ":\"" + term + "\"")
-                        .collect(Collectors.joining(" OR "));
-                participantExpressions.add("(" + participantExpr + ")");
-            }
-            
-            // Combine all participant expressions with OR
-            String allParticipantsExpr = String.join(" OR ", participantExpressions);
-            q.addFilterQuery(allParticipantsExpr);
+    public List<EmailDocument> search(SearchQuery query) {
+        try {
+            SolrQuery q = buildSolrQuery(query);
+            q.setRows(query.size());
+            q.setStart(query.page() * query.size());
+            QueryResponse resp = solr.query(q);
+            return resp.getResults().stream().map(this::fromSolrDoc).toList();
+        } catch (Exception e) {
+            throw new RuntimeException("Search failed", e);
         }
+    }
 
-        return q;
+    public Flux<EmailDocument> searchStream(SearchQuery query, int batchSize) {
+        return Flux.defer(() -> {
+            try {
+                long totalCount = getHitCount(query);
+                int totalPages = (int) Math.ceil((double) totalCount / batchSize);
+
+                return Flux.range(0, Math.max(1, totalPages))
+                        .flatMap(page -> {
+                            try {
+                                SearchQuery pageQuery = new SearchQuery(
+                                        query.start(), query.end(), query.query(),
+                                        query.participantEmails(), query.adminFirmDomain(),
+                                        page, batchSize
+                                );
+                                List<EmailDocument> results = search(pageQuery);
+                                return Flux.fromIterable(results);
+                            } catch (Exception e) {
+                                return Flux.error(new RuntimeException("Stream batch failed for page " + page, e));
+                            }
+                        });
+            } catch (Exception e) {
+                return Flux.error(new RuntimeException("Stream setup failed", e));
+            }
+        });
     }
 
     private static String formatInstant(Instant instant) {
@@ -142,11 +131,44 @@ public class EmailSearchService {
         return String.valueOf(value);
     }
 
-    private static List<String> toList(Collection<?> values) {
-        if (values == null) return List.of();
-        return values.stream()
-                .filter(Objects::nonNull)
-                .map(Object::toString)
-                .collect(Collectors.toList());
+    private SolrQuery buildSolrQuery(SearchQuery query) {
+        SolrQuery q = new SolrQuery();
+        List<String> participants = query.participantEmailsNonEmpty();
+
+        // Base query: use provided query or match all
+        String baseQuery = query.queryOpt().orElse("*:*");
+        q.setQuery(baseQuery);
+
+        // Time range filter
+        String start = formatInstant(query.start());
+        String end = formatInstant(query.end());
+        q.addFilterQuery(EmailDocument.FIELD_SENT_AT + ":[" + start + " TO " + end + "]");
+
+        // Participant filter across allowed fields
+        if (!participants.isEmpty()) {
+            List<String> participantExpressions = new ArrayList<>();
+
+            for (String participant : participants) {
+                String term = ClientUtils.escapeQueryChars(participant.toLowerCase(Locale.ROOT));
+                List<String> fields = new ArrayList<>();
+                fields.add(EmailDocument.FIELD_FROM);
+                fields.add(EmailDocument.FIELD_TO);
+                fields.add(EmailDocument.FIELD_CC);
+                // BCC allowed only if admin firm domain matches participant's domain
+                if (sameDomain(participant, query.adminFirmDomain())) {
+                    fields.add(EmailDocument.FIELD_BCC);
+                }
+                String participantExpr = String.join(" OR ", fields.stream()
+                        .map(f -> f + ":\"" + term + "\"")
+                        .toList());
+                participantExpressions.add("(" + participantExpr + ")");
+            }
+
+            // Combine all participant expressions with OR
+            String allParticipantsExpr = String.join(" OR ", participantExpressions);
+            q.addFilterQuery(allParticipantsExpr);
+        }
+
+        return q;
     }
 }

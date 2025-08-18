@@ -21,7 +21,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EmailSearchServiceTest {
@@ -270,8 +271,8 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
-        SearchQuery query = new SearchQuery(start, end, null, List.of("alice@acme.com", "bob@other.com", "charlie@acme.com"), "acme.com");
+
+        SearchQuery query = new SearchQuery(start, end, null, List.of("alice@acme.com", "bob@other.com", "charlie@acme.com"), "acme.com", 0, 100);
         searchService.search(query);
         
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
@@ -296,6 +297,23 @@ class EmailSearchServiceTest {
         assertThat(participantFilter).contains(" OR ");
     }
 
+    @Test
+    void searchAppliesPaginationParameters() throws Exception {
+        setupMockResponse();
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+
+        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 2, 50); // page 2, size 50
+        searchService.search(query);
+
+        ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+        verify(solrClient).query(captor.capture());
+
+        SolrQuery solrQuery = captor.getValue();
+        assertThat(solrQuery.getRows()).isEqualTo(50); // size
+        assertThat(solrQuery.getStart()).isEqualTo(100); // page 2 * size 50 = start at 100
+    }
+
     private void setupMockResponse() throws Exception {
         when(queryResponse.getResults()).thenReturn(new SolrDocumentList());
         when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
@@ -304,6 +322,6 @@ class EmailSearchServiceTest {
     // Helper method to create SearchQuery with single participant
     private SearchQuery createSearchQuery(Instant start, Instant end, String query, String participantEmail, String adminFirmDomain) {
         List<String> participants = participantEmail != null ? List.of(participantEmail) : null;
-        return new SearchQuery(start, end, query, participants, adminFirmDomain);
+        return new SearchQuery(start, end, query, participants, adminFirmDomain, 0, 100);
     }
 }

@@ -47,7 +47,9 @@ class EmailSearchControllerTest {
                 now.plusSeconds(3600),
                 "test query",
                 List.of("user@test.com"),
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/search")
@@ -58,7 +60,10 @@ class EmailSearchControllerTest {
                 .andExpect(jsonPath("$.emails").isArray())
                 .andExpect(jsonPath("$.emails[0].id").value("1"))
                 .andExpect(jsonPath("$.emails[0].subject").value("Test Subject"))
-                .andExpect(jsonPath("$.totalCount").value(1));
+                .andExpect(jsonPath("$.totalCount").value(1))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(100))
+                .andExpect(jsonPath("$.totalPages").value(1));
 
         verify(emailSearchService).search(any(SearchQuery.class));
         verify(emailSearchService).getHitCount(any(SearchQuery.class));
@@ -74,7 +79,9 @@ class EmailSearchControllerTest {
                 now.plusSeconds(3600),
                 null,
                 null,
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/count")
@@ -94,7 +101,9 @@ class EmailSearchControllerTest {
                 Instant.now(),
                 null,
                 null,
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/search")
@@ -115,7 +124,9 @@ class EmailSearchControllerTest {
                 now.plusSeconds(3600),
                 null,
                 null,
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/search")
@@ -139,7 +150,9 @@ class EmailSearchControllerTest {
                 now,
                 null,
                 null,
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/search")
@@ -157,7 +170,9 @@ class EmailSearchControllerTest {
                 null, // missing required field
                 null,
                 null,
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/count")
@@ -178,7 +193,9 @@ class EmailSearchControllerTest {
                 now.plusSeconds(3600),
                 null,
                 null,
-                "test.com"
+                "test.com",
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/count")
@@ -186,5 +203,36 @@ class EmailSearchControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+    }
+
+    @Test
+    void searchEmailsWithPaginationParameters() throws Exception {
+        Instant now = Instant.parse("2025-01-01T10:00:00Z");
+        EmailDocument email = new EmailDocument(
+                "1", "Test Subject", "Test Body", "from@test.com",
+                List.of("to@test.com"), List.of(), List.of(), now
+        );
+
+        when(emailSearchService.search(any(SearchQuery.class))).thenReturn(List.of(email));
+        when(emailSearchService.getHitCount(any(SearchQuery.class))).thenReturn(50L);
+
+        SearchRequest request = new SearchRequest(
+                now.minusSeconds(3600),
+                now.plusSeconds(3600),
+                null,
+                null,
+                "test.com",
+                2, // page 2
+                10 // size 10
+        );
+
+        mockMvc.perform(post("/api/emails/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalPages").value(5))
+                .andExpect(jsonPath("$.totalCount").value(50));
     }
 }

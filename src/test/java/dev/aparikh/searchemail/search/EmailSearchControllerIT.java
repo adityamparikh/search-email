@@ -10,7 +10,9 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -145,7 +147,9 @@ class EmailSearchControllerIT {
                 now.plusSeconds(3600),
                 null,
                 List.of("alice@acme.com"),
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<SearchResponse> response = restTemplate.postForEntity(
@@ -185,7 +189,9 @@ class EmailSearchControllerIT {
                 now.plusSeconds(3600),
                 null,
                 List.of("alice@acme.com"),
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<HitCountResponse> response = restTemplate.postForEntity(
@@ -217,7 +223,9 @@ class EmailSearchControllerIT {
                 now.plusSeconds(3600),
                 "subject:Meeting",
                 null,
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<SearchResponse> response = restTemplate.postForEntity(
@@ -241,7 +249,9 @@ class EmailSearchControllerIT {
                 now,
                 null,
                 null,
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<ErrorResponse> response = restTemplate.postForEntity(
@@ -263,7 +273,9 @@ class EmailSearchControllerIT {
                 Instant.now(),
                 null,
                 null,
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<ErrorResponse> response = restTemplate.postForEntity(
@@ -296,7 +308,9 @@ class EmailSearchControllerIT {
                 now.plusSeconds(3600),
                 null,
                 List.of("alice@acme.com"),
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<SearchResponse> acmeResponse = restTemplate.postForEntity(
@@ -315,7 +329,9 @@ class EmailSearchControllerIT {
                 now.plusSeconds(3600),
                 null,
                 List.of("bob@other.com"),
-                "acme.com"
+                "acme.com",
+                null,
+                null
         );
 
         ResponseEntity<SearchResponse> bobResponse = restTemplate.postForEntity(
@@ -327,5 +343,67 @@ class EmailSearchControllerIT {
         assertThat(bobResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(bobResponse.getBody().emails()).isEmpty();
         assertThat(bobResponse.getBody().totalCount()).isEqualTo(0);
+    }
+
+    @Test
+    void searchWithPaginationReturnsCorrectPage() {
+        Instant now = Instant.parse("2025-01-01T10:00:00Z");
+
+        // Create 5 emails
+        List<EmailDocument> emails = List.of(
+                new EmailDocument("1", "Email 1", "Content", "sender@test.com", List.of("user@test.com"), List.of(), List.of(), now),
+                new EmailDocument("2", "Email 2", "Content", "sender@test.com", List.of("user@test.com"), List.of(), List.of(), now.plusSeconds(60)),
+                new EmailDocument("3", "Email 3", "Content", "sender@test.com", List.of("user@test.com"), List.of(), List.of(), now.plusSeconds(120)),
+                new EmailDocument("4", "Email 4", "Content", "sender@test.com", List.of("user@test.com"), List.of(), List.of(), now.plusSeconds(180)),
+                new EmailDocument("5", "Email 5", "Content", "sender@test.com", List.of("user@test.com"), List.of(), List.of(), now.plusSeconds(240))
+        );
+        indexService.indexAll(emails);
+
+        // Test first page with size 2
+        SearchRequest page0Request = new SearchRequest(
+                now.minusSeconds(3600),
+                now.plusSeconds(3600),
+                null,
+                List.of("user@test.com"),
+                "test.com",
+                0, // page 0
+                2  // size 2
+        );
+
+        ResponseEntity<SearchResponse> page0Response = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/emails/search",
+                page0Request,
+                SearchResponse.class
+        );
+
+        assertThat(page0Response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(page0Response.getBody().emails()).hasSize(2);
+        assertThat(page0Response.getBody().totalCount()).isEqualTo(5);
+        assertThat(page0Response.getBody().page()).isEqualTo(0);
+        assertThat(page0Response.getBody().size()).isEqualTo(2);
+        assertThat(page0Response.getBody().totalPages()).isEqualTo(3);
+
+        // Test second page
+        SearchRequest page1Request = new SearchRequest(
+                now.minusSeconds(3600),
+                now.plusSeconds(3600),
+                null,
+                List.of("user@test.com"),
+                "test.com",
+                1, // page 1
+                2  // size 2
+        );
+
+        ResponseEntity<SearchResponse> page1Response = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/emails/search",
+                page1Request,
+                SearchResponse.class
+        );
+
+        assertThat(page1Response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(page1Response.getBody().emails()).hasSize(2);
+        assertThat(page1Response.getBody().page()).isEqualTo(1);
+        assertThat(page1Response.getBody().size()).isEqualTo(2);
+        assertThat(page1Response.getBody().totalPages()).isEqualTo(3);
     }
 }
