@@ -7,12 +7,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(SolrProperties.class)
+@EnableConfigurationProperties(SolrConfigurationProperties.class)
 class SolrConfig {
 
-    private final SolrProperties properties;
+    private final SolrConfigurationProperties properties;
 
-    SolrConfig(SolrProperties properties) {
+    SolrConfig(SolrConfigurationProperties properties) {
         this.properties = properties;
     }
 

@@ -1,4 +1,4 @@
-package dev.aparikh.searchemail.search;
+package dev.aparikh.searchemail.model;
 
 import java.time.Instant;
 import java.util.List;
@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Email document to index and fetch from Solr.
  */
-record EmailDocument(
+public record EmailDocument(
         String id,
         String subject,
         String body,

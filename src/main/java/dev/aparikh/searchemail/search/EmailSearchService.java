@@ -1,20 +1,19 @@
 package dev.aparikh.searchemail.search;
 
+import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.client.solrj.util.ClientUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -43,30 +42,15 @@ class EmailSearchService {
         this.solr = solr;
     }
 
-    void index(EmailDocument email) {
-        indexAll(Collections.singletonList(email));
-    }
-
-    void indexAll(List<EmailDocument> emails) {
-        if (emails == null || emails.isEmpty()) return;
-        try {
-            List<SolrInputDocument> docs = emails.stream()
-                    .map(this::toSolrDoc)
-                    .toList();
-            solr.add(docs);
-            solr.commit();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to index emails", e);
-        }
-    }
 
     List<EmailDocument> search(SearchQuery query) {
         try {
             SolrQuery q = new SolrQuery();
             Optional<String> participant = query.participantEmailOpt();
 
-            // Base query: match all, narrow via filters
-            q.setQuery("*:*");
+            // Base query: use provided query or match all
+            String baseQuery = query.queryOpt().orElse("*:*");
+            q.setQuery(baseQuery);
 
             // Time range filter
             String start = formatInstant(query.start());
@@ -114,29 +98,6 @@ class EmailSearchService {
         return email.substring(at + 1).toLowerCase(Locale.ROOT);
     }
 
-    private static String lower(String s) {
-        return s == null ? null : s.toLowerCase(Locale.ROOT);
-    }
-
-    private SolrInputDocument toSolrDoc(EmailDocument e) {
-        SolrInputDocument d = new SolrInputDocument();
-        d.addField(FIELD_ID, e.id());
-        if (e.subject() != null) d.addField(FIELD_SUBJECT, e.subject());
-        if (e.body() != null) d.addField(FIELD_BODY, e.body());
-        if (e.from() != null) d.addField(FIELD_FROM, lower(e.from()));
-        addAll(d, FIELD_TO, e.to());
-        addAll(d, FIELD_CC, e.cc());
-        addAll(d, FIELD_BCC, e.bcc());
-        if (e.sentAt() != null) d.addField(FIELD_SENT_AT, java.util.Date.from(e.sentAt()));
-        return d;
-    }
-
-    private static void addAll(SolrInputDocument d, String field, List<String> values) {
-        if (values == null) return;
-        for (String v : values) {
-            if (v != null && !v.isBlank()) d.addField(field, lower(v));
-        }
-    }
 
     @SuppressWarnings("unchecked")
     private EmailDocument fromSolrDoc(SolrDocument d) {

@@ -37,13 +37,14 @@ This is a Spring Boot 3.5.4 application implementing an email search engine back
 ### Core Components
 
 **Configuration Layer (`dev.aparikh.searchemail.config`)**:
-- `SolrProperties`: Typed configuration for Solr connection (`app.solr.*` properties)
+- `SolrProperties`: Typed configuration for Solr connection (`solr.*` properties)
 - `SolrConfig`: Creates HttpSolrClient bean with URL normalization
 
 **Search Domain (`dev.aparikh.searchemail.search`)**:
 - `EmailDocument`: Record representing email data with all fields (id, subject, body, from, to[], cc[], bcc[], sentAt)
-- `SearchQuery`: Record for search parameters with time range validation and privacy context
-- `EmailSearchService`: Core service handling indexing and searching with privacy enforcement
+- `SearchQuery`: Record for search parameters with configurable query text, time range validation, and privacy context
+- `EmailIndexService`: Service responsible for indexing emails into Solr with proper field mapping and normalization
+- `EmailSearchService`: Service responsible for searching emails with privacy enforcement and configurable query building
 
 ### Privacy Architecture
 The system implements firm-based privacy controls:
@@ -53,9 +54,18 @@ The system implements firm-based privacy controls:
 - Email addresses are normalized to lowercase for consistent matching
 
 ### Data Flow
-1. **Indexing**: EmailDocument → SolrInputDocument → Solr core
-2. **Searching**: SearchQuery → SolrQuery with privacy filters → List<EmailDocument>
+1. **Indexing**: EmailIndexService: EmailDocument → SolrInputDocument → Solr core
+2. **Searching**: EmailSearchService: SearchQuery → SolrQuery with privacy filters → List<EmailDocument>
 3. **Privacy Enforcement**: Applied at query time via conditional BCC field inclusion
+
+### Separation of Concerns
+- **EmailIndexService**: Handles document transformation, field normalization (email addresses to lowercase), and Solr indexing operations
+- **EmailSearchService**: Handles configurable query building, privacy rule enforcement, result parsing, and field value extraction from Solr documents
+
+### Query Capabilities
+- **Configurable Queries**: SearchQuery accepts an optional query parameter for full-text search (defaults to "*:*" for match-all)
+- **Field-Specific Search**: Supports Solr query syntax like `subject:Meeting` or `body:discuss`
+- **Combined Filtering**: Query text works alongside time range and participant filters
 
 ### Solr Schema
 Uses dynamic field creation via Schema API in tests:
@@ -83,9 +93,9 @@ Uses dynamic field creation via Schema API in tests:
 ### Application Properties
 ```properties
 # Solr connection (disabled by default, enabled in tests)
-app.solr.base-url=http://localhost:8983/solr
-app.solr.core=emails
-app.solr.commit-within-ms=0
+solr.base-url=http://localhost:8983/solr
+solr.core=emails
+solr.commit-within-ms=0
 
 # Production best practices
 spring.jpa.open-in-view=false

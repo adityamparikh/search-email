@@ -10,8 +10,8 @@ import jakarta.validation.constraints.PositiveOrZero;
  * Typed configuration properties for Solr connection.
  */
 @Validated
-@ConfigurationProperties(prefix = "app.solr")
-class SolrProperties {
+@ConfigurationProperties(prefix = "solr")
+class SolrConfigurationProperties {
 
     @NotBlank
     private String baseUrl;

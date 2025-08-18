@@ -18,7 +18,7 @@ This module implements an email search engine backed by Apache Solr (via SolrJ).
 
 ## Components
 
-- `SolrProperties` (typed config): `app.solr.base-url`, `app.solr.core`, `app.solr.commit-within-ms`.
+- `SolrProperties` (typed config): `solr.base-url`, `solr.core`, `solr.commit-within-ms`.
 - `SolrConfig`: builds a `SolrClient` (HttpSolrClient).
 - `EmailDocument` (record): holds the email fields to index/fetch.
 - `SearchQuery` (record): holds time range, participant email, and admin firm domain; validates non-null time range and non-decreasing order.
@@ -83,9 +83,9 @@ The integration test spins up `solr:9.6.1`, creates the `emails` core and fields
 
 Add to your application properties (or environment variables):
 
-- `app.solr.base-url=http://localhost:8983/solr`
-- `app.solr.core=emails`
-- `app.solr.commit-within-ms=0`
+- `solr.base-url=http://localhost:8983/solr`
+- `solr.core=emails`
+- `solr.commit-within-ms=0`
 
 By default in this project, Solr is disabled unless explicitly enabled (tests enable it dynamically).
 
