@@ -9,6 +9,7 @@ import java.util.Optional;
  * Optional query provides full-text search terms.
  * Optional participantEmails narrows to emails involving any of those participants.
  * adminFirmDomain is used to enforce BCC privacy.
+ * Optional facetFields enables faceting on specified fields.
  */
 public record SearchQuery(
         Instant start,
@@ -17,7 +18,8 @@ public record SearchQuery(
         List<String> participantEmails,
         String adminFirmDomain,
         int page,
-        int size
+        int size,
+        List<String> facetFields
 ) {
     public SearchQuery {
         if (start == null || end == null) {

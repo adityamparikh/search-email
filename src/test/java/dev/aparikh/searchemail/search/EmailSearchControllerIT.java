@@ -37,26 +37,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class EmailSearchControllerIT {
 
+    @Container
+    static final SolrContainer SOLR = new SolrContainer(DockerImageName.parse("solr:9.6.1"));
+    private static final String CORE = "emails";
     @LocalServerPort
     private int port;
-
     @Autowired
     private TestRestTemplate restTemplate;
-
     @Autowired
     private EmailIndexService indexService;
-
     @Autowired
     private SolrClient solrClient;
 
     private static String solrBaseUrl() {
         return "http://" + SOLR.getHost() + ":" + SOLR.getMappedPort(8983) + "/solr";
     }
-
-    private static final String CORE = "emails";
-
-    @Container
-    static final SolrContainer SOLR = new SolrContainer(DockerImageName.parse("solr:9.6.1"));
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
@@ -149,6 +144,7 @@ class EmailSearchControllerIT {
                 List.of("alice@acme.com"),
                 "acme.com",
                 null,
+                null,
                 null
         );
 
@@ -191,6 +187,7 @@ class EmailSearchControllerIT {
                 List.of("alice@acme.com"),
                 "acme.com",
                 null,
+                null,
                 null
         );
 
@@ -225,6 +222,7 @@ class EmailSearchControllerIT {
                 null,
                 "acme.com",
                 null,
+                null,
                 null
         );
 
@@ -251,6 +249,7 @@ class EmailSearchControllerIT {
                 null,
                 "acme.com",
                 null,
+                null,
                 null
         );
 
@@ -274,6 +273,7 @@ class EmailSearchControllerIT {
                 null,
                 null,
                 "acme.com",
+                null,
                 null,
                 null
         );
@@ -310,6 +310,7 @@ class EmailSearchControllerIT {
                 List.of("alice@acme.com"),
                 "acme.com",
                 null,
+                null,
                 null
         );
 
@@ -330,6 +331,7 @@ class EmailSearchControllerIT {
                 null,
                 List.of("bob@other.com"),
                 "acme.com",
+                null,
                 null,
                 null
         );
@@ -367,7 +369,8 @@ class EmailSearchControllerIT {
                 List.of("user@test.com"),
                 "test.com",
                 0, // page 0
-                2  // size 2
+                2,  // size 2
+                null
         );
 
         ResponseEntity<SearchResponse> page0Response = restTemplate.postForEntity(
@@ -391,7 +394,8 @@ class EmailSearchControllerIT {
                 List.of("user@test.com"),
                 "test.com",
                 1, // page 1
-                2  // size 2
+                2,  // size 2
+                null
         );
 
         ResponseEntity<SearchResponse> page1Response = restTemplate.postForEntity(

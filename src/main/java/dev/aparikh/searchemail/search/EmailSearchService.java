@@ -3,6 +3,7 @@ package dev.aparikh.searchemail.search;
 import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.response.FacetField;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.SolrDocument;
@@ -36,6 +37,32 @@ public class EmailSearchService {
                 .toList();
     }
 
+    private static String formatInstant(Instant instant) {
+        return instant.toString(); // ISO-8601 with Z accepted by Solr
+    }
+
+    private static boolean sameDomain(String email, String adminFirmDomain) {
+        if (email == null || adminFirmDomain == null) return false;
+        String domain = emailDomain(email);
+        return domain.equalsIgnoreCase(adminFirmDomain);
+    }
+
+    private static String emailDomain(String email) {
+        int at = email.lastIndexOf('@');
+        if (at == -1 || at == email.length() - 1) return "";
+        return email.substring(at + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private static String getFieldAsString(SolrDocument d, String fieldName) {
+        Object value = d.getFieldValue(fieldName);
+        if (value == null) return null;
+        if (value instanceof String) return (String) value;
+        if (value instanceof Collection<?> collection && !collection.isEmpty()) {
+            return String.valueOf(collection.iterator().next());
+        }
+        return String.valueOf(value);
+    }
+
     public long getHitCount(SearchQuery query) {
         try {
             SolrQuery q = buildSolrQuery(query);
@@ -59,6 +86,46 @@ public class EmailSearchService {
         }
     }
 
+    public SearchResult searchWithFacets(SearchQuery query) {
+        try {
+            SolrQuery q = buildSolrQuery(query);
+            q.setRows(query.size());
+            q.setStart(query.page() * query.size());
+
+            // Add faceting configuration
+            if (query.facetFields() != null && !query.facetFields().isEmpty()) {
+                q.setFacet(true);
+                q.setFacetMinCount(1);
+                q.setFacetLimit(100);
+
+                for (String facetField : query.facetFields()) {
+                    q.addFacetField(facetField);
+                }
+            }
+
+            QueryResponse resp = solr.query(q);
+            List<EmailDocument> emails = resp.getResults().stream().map(this::fromSolrDoc).toList();
+            long totalCount = resp.getResults().getNumFound();
+            int totalPages = (int) Math.ceil((double) totalCount / query.size());
+
+            Map<String, FacetResult> facets = new HashMap<>();
+            if (resp.getFacetFields() != null) {
+                for (FacetField facetField : resp.getFacetFields()) {
+                    if (facetField.getValues() != null) {
+                        List<FacetValue> values = facetField.getValues().stream()
+                                .map(count -> new FacetValue(count.getName(), count.getCount()))
+                                .toList();
+                        facets.put(facetField.getName(), new FacetResult(facetField.getName(), values));
+                    }
+                }
+            }
+
+            return new SearchResult(emails, totalCount, query.page(), query.size(), totalPages, facets);
+        } catch (Exception e) {
+            throw new RuntimeException("Search with facets failed", e);
+        }
+    }
+
     public Flux<EmailDocument> searchStream(SearchQuery query, int batchSize) {
         return Flux.defer(() -> {
             try {
@@ -71,7 +138,7 @@ public class EmailSearchService {
                                 SearchQuery pageQuery = new SearchQuery(
                                         query.start(), query.end(), query.query(),
                                         query.participantEmails(), query.adminFirmDomain(),
-                                        page, batchSize
+                                        page, batchSize, query.facetFields()
                                 );
                                 List<EmailDocument> results = search(pageQuery);
                                 return Flux.fromIterable(results);
@@ -84,23 +151,6 @@ public class EmailSearchService {
             }
         });
     }
-
-    private static String formatInstant(Instant instant) {
-        return instant.toString(); // ISO-8601 with Z accepted by Solr
-    }
-
-    private static boolean sameDomain(String email, String adminFirmDomain) {
-        if (email == null || adminFirmDomain == null) return false;
-        String domain = emailDomain(email);
-        return domain.equalsIgnoreCase(adminFirmDomain);
-    }
-
-    private static String emailDomain(String email) {
-        int at = email.lastIndexOf('@');
-        if (at == -1 || at == email.length() - 1) return "";
-        return email.substring(at + 1).toLowerCase(Locale.ROOT);
-    }
-
 
     @SuppressWarnings("unchecked")
     private EmailDocument fromSolrDoc(SolrDocument d) {
@@ -119,16 +169,6 @@ public class EmailSearchService {
             sentAt = Instant.parse(s);
         }
         return new EmailDocument(id, subject, body, from, to, cc, bcc, sentAt);
-    }
-    
-    private static String getFieldAsString(SolrDocument d, String fieldName) {
-        Object value = d.getFieldValue(fieldName);
-        if (value == null) return null;
-        if (value instanceof String) return (String) value;
-        if (value instanceof Collection<?> collection && !collection.isEmpty()) {
-            return String.valueOf(collection.iterator().next());
-        }
-        return String.valueOf(value);
     }
 
     private SolrQuery buildSolrQuery(SearchQuery query) {

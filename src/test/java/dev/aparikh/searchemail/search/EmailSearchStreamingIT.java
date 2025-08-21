@@ -139,7 +139,8 @@ class EmailSearchStreamingIT {
                 List.of("user@test.com"),
                 "test.com",
                 0,
-                1000
+                1000,
+                null
         );
 
         StepVerifier.create(searchService.searchStream(streamQuery, 2))
