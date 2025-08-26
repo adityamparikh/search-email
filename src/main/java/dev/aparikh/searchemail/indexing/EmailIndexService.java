@@ -24,6 +24,17 @@ public class EmailIndexService {
         this.solr = solr;
     }
 
+    private static void addAll(SolrInputDocument d, String field, List<String> values) {
+        if (values == null) return;
+        for (String v : values) {
+            if (v != null && !v.isBlank()) d.addField(field, lower(v));
+        }
+    }
+
+    private static String lower(String s) {
+        return s == null ? null : s.toLowerCase(Locale.ROOT);
+    }
+
     public void index(EmailDocument email) {
         indexAll(Collections.singletonList(email));
     }
@@ -52,16 +63,5 @@ public class EmailIndexService {
         addAll(d, EmailDocument.FIELD_BCC, e.bcc());
         if (e.sentAt() != null) d.addField(EmailDocument.FIELD_SENT_AT, java.util.Date.from(e.sentAt()));
         return d;
-    }
-
-    private static void addAll(SolrInputDocument d, String field, List<String> values) {
-        if (values == null) return;
-        for (String v : values) {
-            if (v != null && !v.isBlank()) d.addField(field, lower(v));
-        }
-    }
-
-    private static String lower(String s) {
-        return s == null ? null : s.toLowerCase(Locale.ROOT);
     }
 }

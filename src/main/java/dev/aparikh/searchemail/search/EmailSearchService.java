@@ -93,22 +93,49 @@ public class EmailSearchService {
             q.setStart(query.page() * query.size());
 
             // Add faceting configuration
-            if (query.facetFields() != null && !query.facetFields().isEmpty()) {
+            boolean hasFacetFields = query.facetFields() != null && !query.facetFields().isEmpty();
+            boolean hasFacetQueries = query.facetQueries() != null && !query.facetQueries().isEmpty();
+            
+            if (hasFacetFields || hasFacetQueries) {
                 q.setFacet(true);
                 q.setFacetMinCount(1);
                 q.setFacetLimit(100);
 
-                for (String facetField : query.facetFields()) {
-                    q.addFacetField(facetField);
+                // Add field-based faceting
+                if (hasFacetFields) {
+                    for (String facetField : query.facetFields()) {
+                        q.addFacetField(facetField);
+                    }
+                }
+                
+                // Add query-based faceting
+                if (hasFacetQueries) {
+                    for (FacetQueryDefinition facetQuery : query.facetQueries()) {
+                        q.addFacetQuery(facetQuery.query());
+                    }
                 }
             }
 
-            QueryResponse resp = solr.query(q);
+            QueryResponse resp;
+            try {
+                resp = solr.query(q);
+            } catch (Exception solrException) {
+                // If the query fails due to invalid facet fields, retry without faceting
+                log.warn("Faceted query failed, retrying without facets: {}", solrException.getMessage());
+                SolrQuery fallbackQuery = buildSolrQuery(query);
+                fallbackQuery.setRows(query.size());
+                fallbackQuery.setStart(query.page() * query.size());
+                // Don't add faceting to fallback query
+                resp = solr.query(fallbackQuery);
+            }
+            
             List<EmailDocument> emails = resp.getResults().stream().map(this::fromSolrDoc).toList();
             long totalCount = resp.getResults().getNumFound();
             int totalPages = (int) Math.ceil((double) totalCount / query.size());
 
             Map<String, FacetResult> facets = new HashMap<>();
+            
+            // Process field-based facet results
             if (resp.getFacetFields() != null) {
                 for (FacetField facetField : resp.getFacetFields()) {
                     if (facetField.getValues() != null) {
@@ -116,6 +143,27 @@ public class EmailSearchService {
                                 .map(count -> new FacetValue(count.getName(), count.getCount()))
                                 .toList();
                         facets.put(facetField.getName(), new FacetResult(facetField.getName(), values));
+                    }
+                }
+            }
+            
+            // Process query-based facet results
+            if (resp.getFacetQuery() != null && hasFacetQueries) {
+                // Create a map of query to label for easy lookup
+                Map<String, String> queryToLabel = query.facetQueries().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                FacetQueryDefinition::query,
+                                FacetQueryDefinition::label
+                        ));
+                
+                for (Map.Entry<String, Integer> facetQueryResult : resp.getFacetQuery().entrySet()) {
+                    String facetQuery = facetQueryResult.getKey();
+                    Integer count = facetQueryResult.getValue();
+                    String label = queryToLabel.get(facetQuery);
+                    
+                    if (label != null && count != null && count > 0) {
+                        List<FacetValue> values = List.of(new FacetValue(label, count.longValue()));
+                        facets.put(label, new FacetResult(label, values));
                     }
                 }
             }
@@ -138,7 +186,7 @@ public class EmailSearchService {
                                 SearchQuery pageQuery = new SearchQuery(
                                         query.start(), query.end(), query.query(),
                                         query.participantEmails(), query.adminFirmDomain(),
-                                        page, batchSize, query.facetFields()
+                                        page, batchSize, query.facetFields(), query.facetQueries()
                                 );
                                 List<EmailDocument> results = search(pageQuery);
                                 return Flux.fromIterable(results);
@@ -169,6 +217,14 @@ public class EmailSearchService {
             sentAt = Instant.parse(s);
         }
         return new EmailDocument(id, subject, body, from, to, cc, bcc, sentAt);
+    }
+
+    private String mapSortField(String field) {
+        // Map common field aliases to actual Solr field names
+        return switch (field.toLowerCase()) {
+            case "timestamp" -> EmailDocument.FIELD_SENT_AT;
+            default -> field;
+        };
     }
 
     private SolrQuery buildSolrQuery(SearchQuery query) {
@@ -207,6 +263,27 @@ public class EmailSearchService {
             // Combine all participant expressions with OR
             String allParticipantsExpr = String.join(" OR ", participantExpressions);
             q.addFilterQuery(allParticipantsExpr);
+        }
+
+        // Add sorting if specified
+        if (query.sortOpt().isPresent()) {
+            String sortString = query.sortOpt().get();
+            String[] parts = sortString.split("\\s+");
+            if (parts.length >= 2) {
+                String field = parts[0];
+                String direction = parts[1];
+                
+                // Map common field aliases to actual Solr field names
+                String mappedField = mapSortField(field);
+                
+                SolrQuery.ORDER order = "desc".equalsIgnoreCase(direction) ? 
+                    SolrQuery.ORDER.desc : SolrQuery.ORDER.asc;
+                q.setSort(mappedField, order);
+            } else if (parts.length == 1) {
+                // Default to ascending if no direction specified
+                String mappedField = mapSortField(parts[0]);
+                q.setSort(mappedField, SolrQuery.ORDER.asc);
+            }
         }
 
         return q;

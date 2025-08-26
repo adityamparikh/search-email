@@ -50,6 +50,8 @@ class EmailSearchControllerTest {
                 "test.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -83,6 +85,8 @@ class EmailSearchControllerTest {
                 "test.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -104,6 +108,8 @@ class EmailSearchControllerTest {
                 null,
                 null,
                 "test.com",
+                null,
+                null,
                 null,
                 null,
                 null
@@ -128,6 +134,8 @@ class EmailSearchControllerTest {
                 null,
                 null,
                 "test.com",
+                null,
+                null,
                 null,
                 null,
                 null
@@ -157,6 +165,8 @@ class EmailSearchControllerTest {
                 "test.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -176,6 +186,8 @@ class EmailSearchControllerTest {
                 null,
                 null,
                 "test.com",
+                null,
+                null,
                 null,
                 null,
                 null
@@ -200,6 +212,8 @@ class EmailSearchControllerTest {
                 null,
                 null,
                 "test.com",
+                null,
+                null,
                 null,
                 null,
                 null
@@ -231,6 +245,8 @@ class EmailSearchControllerTest {
                 "test.com",
                 2, // page 2
                 10, // size 10
+                null,
+                null,
                 null
         );
 

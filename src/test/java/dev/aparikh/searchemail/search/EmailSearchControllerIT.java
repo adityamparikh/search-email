@@ -145,6 +145,8 @@ class EmailSearchControllerIT {
                 "acme.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -188,6 +190,8 @@ class EmailSearchControllerIT {
                 "acme.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -223,6 +227,8 @@ class EmailSearchControllerIT {
                 "acme.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -250,6 +256,8 @@ class EmailSearchControllerIT {
                 "acme.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -273,6 +281,8 @@ class EmailSearchControllerIT {
                 null,
                 null,
                 "acme.com",
+                null,
+                null,
                 null,
                 null,
                 null
@@ -311,6 +321,8 @@ class EmailSearchControllerIT {
                 "acme.com",
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
@@ -331,6 +343,8 @@ class EmailSearchControllerIT {
                 null,
                 List.of("bob@other.com"),
                 "acme.com",
+                null,
+                null,
                 null,
                 null,
                 null
@@ -370,6 +384,8 @@ class EmailSearchControllerIT {
                 "test.com",
                 0, // page 0
                 2,  // size 2
+                null,
+                null,
                 null
         );
 
@@ -395,6 +411,8 @@ class EmailSearchControllerIT {
                 "test.com",
                 1, // page 1
                 2,  // size 2
+                null,
+                null,
                 null
         );
 

@@ -135,7 +135,8 @@ class FacetingIT {
                 null,
                 "acme.com",
                 0, 10,
-                List.of(EmailDocument.FIELD_FROM)
+                List.of(EmailDocument.FIELD_FROM),
+                null
         );
 
         SearchResult result = searchService.searchWithFacets(query);

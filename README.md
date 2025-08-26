@@ -6,6 +6,7 @@ privacy-aware search capabilities where BCC participants are only visible to adm
 ## Build and Development Commands
 
 ### Core Commands
+
 ```bash
 # Build the project
 ./gradlew build

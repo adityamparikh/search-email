@@ -17,4 +17,5 @@ public record ErrorResponse(
 
         @Schema(description = "Timestamp of the error", example = "2025-01-01T10:00:00Z")
         Instant timestamp
-) {}
+) {
+}

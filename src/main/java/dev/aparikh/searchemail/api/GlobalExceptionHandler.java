@@ -25,13 +25,13 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
-        
+
         ErrorResponse error = new ErrorResponse(
                 "Validation failed: " + message,
                 "VALIDATION_ERROR",
                 Instant.now()
         );
-        
+
         return ResponseEntity.badRequest().body(error);
     }
 
@@ -42,20 +42,20 @@ public class GlobalExceptionHandler {
                 "INVALID_ARGUMENT",
                 Instant.now()
         );
-        
+
         return ResponseEntity.badRequest().body(error);
     }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
         log.error("Unexpected error during API operation", ex);
-        
+
         ErrorResponse error = new ErrorResponse(
                 "An unexpected error occurred",
                 "INTERNAL_ERROR",
                 Instant.now()
         );
-        
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }

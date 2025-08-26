@@ -1,6 +1,7 @@
 package dev.aparikh.searchemail.api;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import dev.aparikh.searchemail.search.FacetQueryDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
@@ -50,6 +51,14 @@ public record SearchRequest(
 
         @Schema(description = "Fields to facet on for aggregated counts",
                 example = "[\"from_addr\", \"to_addr\"]")
-        List<String> facetFields
+        List<String> facetFields,
+
+        @Schema(description = "Custom facet queries with labels for query-based faceting",
+                example = "[{\"label\": \"External Emails\", \"query\": \"NOT from_addr:*@company.com\"}, {\"label\": \"Meeting Related\", \"query\": \"subject:*meeting*\"}]")
+        List<FacetQueryDefinition> facetQueries,
+
+        @Schema(description = "Sort criteria for results (Solr syntax)",
+                example = "timestamp desc")
+        String sort
 ) {
 }

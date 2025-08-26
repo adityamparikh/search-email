@@ -66,7 +66,10 @@ public class EmailSearchController {
 
         SearchQuery query = toSearchQuery(request);
 
-        if (query.facetFields() != null && !query.facetFields().isEmpty()) {
+        boolean hasFacetFields = query.facetFields() != null && !query.facetFields().isEmpty();
+        boolean hasFacetQueries = query.facetQueries() != null && !query.facetQueries().isEmpty();
+        
+        if (hasFacetFields || hasFacetQueries) {
             SearchResult result = emailSearchService.searchWithFacets(query);
             SearchResponse response = new SearchResponse(result.emails(), result.totalCount(),
                     result.page(), result.size(), result.totalPages(), result.facets());
@@ -162,7 +165,9 @@ public class EmailSearchController {
                 request.adminFirmDomain(),
                 page,
                 size,
-                request.facetFields()
+                request.facetFields(),
+                request.facetQueries(),
+                request.sort()
         );
     }
 
@@ -175,7 +180,8 @@ public class EmailSearchController {
                 request.adminFirmDomain(),
                 0, // Always start from page 0 for streaming
                 1000, // Default batch size for streaming
-                null // No faceting for streaming
+                null, // No faceting for streaming
+                null // No facet queries for streaming
         );
     }
 }
