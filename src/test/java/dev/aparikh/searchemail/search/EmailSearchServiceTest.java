@@ -91,7 +91,7 @@ class EmailSearchServiceTest {
     }
 
     @Test
-    void searchAddsParticipantFilterWithoutBccWhenDomainsDiffer() throws Exception {
+    void searchAddsParticipantFilterWithBccEvenWhenDomainsDiffer() throws Exception {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
@@ -105,7 +105,7 @@ class EmailSearchServiceTest {
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).hasSize(2);
-        assertThat(filterQueries[1]).isEqualTo("(from_addr:\"alice@other.com\" OR to_addr:\"alice@other.com\" OR cc_addr:\"alice@other.com\")");
+        assertThat(filterQueries[1]).isEqualTo("(from_addr:\"alice@other.com\" OR to_addr:\"alice@other.com\" OR cc_addr:\"alice@other.com\" OR bcc_addr:\"alice@other.com\")");
     }
 
     @Test
@@ -289,10 +289,10 @@ class EmailSearchServiceTest {
         assertThat(participantFilter).contains("bob@other.com");
         assertThat(participantFilter).contains("charlie@acme.com");
 
-        // Should include BCC for acme.com participants (alice and charlie) but not bob@other.com
+        // Should include BCC for all participants when admin firm domain is provided
         assertThat(participantFilter).contains("bcc_addr:\"alice@acme.com\"");
         assertThat(participantFilter).contains("bcc_addr:\"charlie@acme.com\"");
-        assertThat(participantFilter).doesNotContain("bcc_addr:\"bob@other.com\"");
+        assertThat(participantFilter).contains("bcc_addr:\"bob@other.com\"");
 
         // Should combine participants with OR
         assertThat(participantFilter).contains(" OR ");

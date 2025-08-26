@@ -336,7 +336,7 @@ class EmailSearchControllerIT {
         assertThat(acmeResponse.getBody().emails()).hasSize(1);
         assertThat(acmeResponse.getBody().emails().get(0).id()).isEqualTo("1");
 
-        // Admin from acme.com should not see bob@other.com BCC
+        // Admin from acme.com can now see bob@other.com BCC due to cross-firm search capability
         SearchRequest searchForBob = new SearchRequest(
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
@@ -357,8 +357,9 @@ class EmailSearchControllerIT {
         );
 
         assertThat(bobResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(bobResponse.getBody().emails()).isEmpty();
-        assertThat(bobResponse.getBody().totalCount()).isEqualTo(0);
+        assertThat(bobResponse.getBody().emails()).hasSize(1);
+        assertThat(bobResponse.getBody().emails().get(0).id()).isEqualTo("2");
+        assertThat(bobResponse.getBody().totalCount()).isEqualTo(1);
     }
 
     @Test

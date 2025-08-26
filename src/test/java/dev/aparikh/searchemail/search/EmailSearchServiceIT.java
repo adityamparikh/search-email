@@ -127,7 +127,7 @@ class EmailSearchServiceIT {
     }
 
     @Test
-    void bccVisibleOnlyWhenAdminFirmMatchesParticipantDomain() {
+    void bccVisibleForAllParticipantsWhenAdminFirmDomainProvided() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
         EmailDocument bccAcme = new EmailDocument(
                 "1", "s", "b", "sender@corp.com",
@@ -145,7 +145,7 @@ class EmailSearchServiceIT {
 
         SearchQuery q2 = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
         List<EmailDocument> r2 = searchService.search(q2);
-        assertThat(r2).extracting(EmailDocument::id).doesNotContain("2");
+        assertThat(r2).extracting(EmailDocument::id).contains("2");
     }
 
     @Test
