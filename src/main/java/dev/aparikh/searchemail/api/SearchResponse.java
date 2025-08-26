@@ -1,9 +1,11 @@
 package dev.aparikh.searchemail.api;
 
 import dev.aparikh.searchemail.model.EmailDocument;
+import dev.aparikh.searchemail.search.FacetResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Response DTO for email search API.
@@ -23,5 +25,9 @@ public record SearchResponse(
         int size,
 
         @Schema(description = "Total number of pages", example = "5")
-        int totalPages
-) {}
+        int totalPages,
+
+        @Schema(description = "Faceting results by field name")
+        Map<String, FacetResult> facets
+) {
+}

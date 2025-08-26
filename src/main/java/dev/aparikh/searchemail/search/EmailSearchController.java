@@ -63,14 +63,24 @@ public class EmailSearchController {
     public ResponseEntity<SearchResponse> searchEmails(
             @Parameter(description = "Search request parameters", required = true)
             @Valid @RequestBody SearchRequest request) {
-        
-        SearchQuery query = toSearchQuery(request);
-        List<EmailDocument> emails = emailSearchService.search(query);
-        long totalCount = emailSearchService.getHitCount(query);
 
-        int totalPages = (int) Math.ceil((double) totalCount / query.size());
-        SearchResponse response = new SearchResponse(emails, totalCount, query.page(), query.size(), totalPages);
-        return ResponseEntity.ok(response);
+        SearchQuery query = toSearchQuery(request);
+
+        boolean hasFacetFields = query.facetFields() != null && !query.facetFields().isEmpty();
+        boolean hasFacetQueries = query.facetQueries() != null && !query.facetQueries().isEmpty();
+        
+        if (hasFacetFields || hasFacetQueries) {
+            SearchResult result = emailSearchService.searchWithFacets(query);
+            SearchResponse response = new SearchResponse(result.emails(), result.totalCount(),
+                    result.page(), result.size(), result.totalPages(), result.facets());
+            return ResponseEntity.ok(response);
+        } else {
+            List<EmailDocument> emails = emailSearchService.search(query);
+            long totalCount = emailSearchService.getHitCount(query);
+            int totalPages = (int) Math.ceil((double) totalCount / query.size());
+            SearchResponse response = new SearchResponse(emails, totalCount, query.page(), query.size(), totalPages, null);
+            return ResponseEntity.ok(response);
+        }
     }
 
     @PostMapping(value = "/count", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -99,10 +109,10 @@ public class EmailSearchController {
     public ResponseEntity<HitCountResponse> getHitCount(
             @Parameter(description = "Search request parameters for counting", required = true)
             @Valid @RequestBody SearchRequest request) {
-        
+
         SearchQuery query = toSearchQuery(request);
         long count = emailSearchService.getHitCount(query);
-        
+
         HitCountResponse response = new HitCountResponse(count);
         return ResponseEntity.ok(response);
     }
@@ -154,7 +164,10 @@ public class EmailSearchController {
                 request.participantEmails(),
                 request.adminFirmDomain(),
                 page,
-                size
+                size,
+                request.facetFields(),
+                request.facetQueries(),
+                request.sort()
         );
     }
 
@@ -166,7 +179,9 @@ public class EmailSearchController {
                 request.participantEmails(),
                 request.adminFirmDomain(),
                 0, // Always start from page 0 for streaming
-                1000 // Default batch size for streaming
+                1000, // Default batch size for streaming
+                null, // No faceting for streaming
+                null // No facet queries for streaming
         );
     }
 }

@@ -3,6 +3,7 @@ package dev.aparikh.searchemail.search;
 import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -45,13 +46,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, "subject:meeting", null, "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         assertThat(solrQuery.getQuery()).isEqualTo("subject:meeting");
     }
@@ -61,13 +62,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         assertThat(solrQuery.getQuery()).isEqualTo("*:*");
     }
@@ -77,13 +78,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).containsExactly("sent_at:[2025-01-01T10:00:00Z TO 2025-01-01T11:00:00Z]");
@@ -94,13 +95,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, "alice@other.com", "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).hasSize(2);
@@ -112,13 +113,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, "alice@domain.com", "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).hasSize(2);
@@ -130,13 +131,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).hasSize(1); // Only time range filter
@@ -147,13 +148,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         assertThat(solrQuery.getRows()).isEqualTo(100);
     }
@@ -171,16 +172,16 @@ class EmailSearchServiceTest {
         doc.setField(EmailDocument.FIELD_BCC, List.of("bcc@test.com"));
         doc.setField(EmailDocument.FIELD_SENT_AT, Date.from(Instant.parse("2025-01-01T10:00:00Z")));
         docs.add(doc);
-        
+
         when(queryResponse.getResults()).thenReturn(docs);
         when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
-        
+
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
-        
+
         List<EmailDocument> results = searchService.search(query);
-        
+
         assertThat(results).hasSize(1);
         EmailDocument email = results.get(0);
         assertThat(email.id()).isEqualTo("test-id");
@@ -200,16 +201,16 @@ class EmailSearchServiceTest {
         doc.setField(EmailDocument.FIELD_ID, "test-id");
         doc.setField(EmailDocument.FIELD_SUBJECT, new ArrayList<>(List.of("Subject in ArrayList")));
         docs.add(doc);
-        
+
         when(queryResponse.getResults()).thenReturn(docs);
         when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
-        
+
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
-        
+
         List<EmailDocument> results = searchService.search(query);
-        
+
         assertThat(results).hasSize(1);
         assertThat(results.get(0).subject()).isEqualTo("Subject in ArrayList");
     }
@@ -221,32 +222,32 @@ class EmailSearchServiceTest {
         doc.setField(EmailDocument.FIELD_ID, "test-id");
         doc.setField(EmailDocument.FIELD_SENT_AT, "2025-01-01T10:00:00Z");
         docs.add(doc);
-        
+
         when(queryResponse.getResults()).thenReturn(docs);
         when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
-        
+
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
-        
+
         List<EmailDocument> results = searchService.search(query);
-        
+
         assertThat(results).hasSize(1);
         assertThat(results.get(0).sentAt()).isEqualTo(Instant.parse("2025-01-01T10:00:00Z"));
     }
 
     @Test
     void searchWrapsExceptionFromSolr() throws Exception {
-        when(solrClient.query(any(SolrQuery.class))).thenThrow(new RuntimeException("Solr error"));
-        
+        when(solrClient.query(any(SolrQuery.class))).thenThrow(new SolrServerException("Solr error"));
+
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
         SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
-        
+
         assertThatThrownBy(() -> searchService.search(query))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Search failed")
-                .hasCauseInstanceOf(RuntimeException.class);
+                .hasCauseInstanceOf(SolrServerException.class);
     }
 
     @Test
@@ -254,13 +255,13 @@ class EmailSearchServiceTest {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
-        
+
         SearchQuery query = createSearchQuery(start, end, null, "user+test@domain.com", "domain.com");
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries[1]).contains("\"user\\+test@domain.com\"");
@@ -272,27 +273,27 @@ class EmailSearchServiceTest {
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
 
-        SearchQuery query = new SearchQuery(start, end, null, List.of("alice@acme.com", "bob@other.com", "charlie@acme.com"), "acme.com", 0, 100);
+        SearchQuery query = new SearchQuery(start, end, null, List.of("alice@acme.com", "bob@other.com", "charlie@acme.com"), "acme.com", 0, 100, null);
         searchService.search(query);
-        
+
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
         verify(solrClient).query(captor.capture());
-        
+
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).hasSize(2);
         String participantFilter = filterQueries[1];
-        
+
         // Should contain all three participants with appropriate field access
         assertThat(participantFilter).contains("alice@acme.com");
-        assertThat(participantFilter).contains("bob@other.com"); 
+        assertThat(participantFilter).contains("bob@other.com");
         assertThat(participantFilter).contains("charlie@acme.com");
-        
+
         // Should include BCC for acme.com participants (alice and charlie) but not bob@other.com
         assertThat(participantFilter).contains("bcc_addr:\"alice@acme.com\"");
         assertThat(participantFilter).contains("bcc_addr:\"charlie@acme.com\"");
         assertThat(participantFilter).doesNotContain("bcc_addr:\"bob@other.com\"");
-        
+
         // Should combine participants with OR
         assertThat(participantFilter).contains(" OR ");
     }
@@ -303,7 +304,7 @@ class EmailSearchServiceTest {
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
 
-        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 2, 50); // page 2, size 50
+        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 2, 50, null); // page 2, size 50
         searchService.search(query);
 
         ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
@@ -322,6 +323,6 @@ class EmailSearchServiceTest {
     // Helper method to create SearchQuery with single participant
     private SearchQuery createSearchQuery(Instant start, Instant end, String query, String participantEmail, String adminFirmDomain) {
         List<String> participants = participantEmail != null ? List.of(participantEmail) : null;
-        return new SearchQuery(start, end, query, participants, adminFirmDomain, 0, 100);
+        return new SearchQuery(start, end, query, participants, adminFirmDomain, 0, 100, null);
     }
 }

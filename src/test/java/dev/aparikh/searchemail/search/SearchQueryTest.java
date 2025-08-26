@@ -16,21 +16,21 @@ class SearchQueryTest {
     @Test
     void constructorValidatesTimeRange() {
         // Valid time range
-        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null);
         assertThat(query.start()).isEqualTo(start);
         assertThat(query.end()).isEqualTo(end);
     }
 
     @Test
     void constructorRejectsNullStart() {
-        assertThatThrownBy(() -> new SearchQuery(null, end, null, null, "domain.com", 0, 100))
+        assertThatThrownBy(() -> new SearchQuery(null, end, null, null, "domain.com", 0, 100, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("start and end must be provided");
     }
 
     @Test
     void constructorRejectsNullEnd() {
-        assertThatThrownBy(() -> new SearchQuery(start, null, null, null, "domain.com", 0, 100))
+        assertThatThrownBy(() -> new SearchQuery(start, null, null, null, "domain.com", 0, 100, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("start and end must be provided");
     }
@@ -38,45 +38,45 @@ class SearchQueryTest {
     @Test
     void constructorRejectsEndBeforeStart() {
         Instant laterStart = end.plusSeconds(1); // Start after end
-        assertThatThrownBy(() -> new SearchQuery(laterStart, end, null, null, "domain.com", 0, 100))
+        assertThatThrownBy(() -> new SearchQuery(laterStart, end, null, null, "domain.com", 0, 100, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("end must be >= start");
     }
 
     @Test
     void constructorAllowsEqualStartAndEnd() {
-        var query = new SearchQuery(start, start, null, null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, start, null, null, "domain.com", 0, 100, null);
         assertThat(query.start()).isEqualTo(start);
         assertThat(query.end()).isEqualTo(start);
     }
 
     @Test
     void queryOptReturnsEmptyForNull() {
-        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null);
         assertThat(query.queryOpt()).isEmpty();
     }
 
     @Test
     void queryOptReturnsEmptyForBlankString() {
-        var query = new SearchQuery(start, end, "   ", null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, "   ", null, "domain.com", 0, 100, null);
         assertThat(query.queryOpt()).isEmpty();
     }
 
     @Test
     void queryOptReturnsEmptyForEmptyString() {
-        var query = new SearchQuery(start, end, "", null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, "", null, "domain.com", 0, 100, null);
         assertThat(query.queryOpt()).isEmpty();
     }
 
     @Test
     void queryOptReturnsValueForNonBlankString() {
-        var query = new SearchQuery(start, end, "subject:meeting", null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, "subject:meeting", null, "domain.com", 0, 100, null);
         assertThat(query.queryOpt()).hasValue("subject:meeting");
     }
 
     @Test
     void participantEmailsNonEmptyReturnsEmptyForNull() {
-        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null);
         assertThat(query.participantEmailsNonEmpty()).isEmpty();
     }
 
@@ -89,26 +89,26 @@ class SearchQueryTest {
         participantList.add(null);
         participantList.add("bob@example.com");
 
-        var query = new SearchQuery(start, end, null, participantList, "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, null, participantList, "domain.com", 0, 100, null);
         assertThat(query.participantEmailsNonEmpty()).containsExactly("alice@example.com", "bob@example.com");
     }
 
     @Test
     void participantEmailsNonEmptyReturnsEmptyForEmptyList() {
-        var query = new SearchQuery(start, end, null, List.of(), "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, null, List.of(), "domain.com", 0, 100, null);
         assertThat(query.participantEmailsNonEmpty()).isEmpty();
     }
 
     @Test
     void participantEmailsNonEmptyReturnsValidEmails() {
-        var query = new SearchQuery(start, end, null, List.of("alice@example.com", "bob@example.com"), "domain.com", 0, 100);
+        var query = new SearchQuery(start, end, null, List.of("alice@example.com", "bob@example.com"), "domain.com", 0, 100, null);
         assertThat(query.participantEmailsNonEmpty()).containsExactly("alice@example.com", "bob@example.com");
     }
 
     @Test
     void recordFieldsAreAccessible() {
-        var query = new SearchQuery(start, end, "test query", List.of("user@domain.com"), "domain.com", 0, 100);
-        
+        var query = new SearchQuery(start, end, "test query", List.of("user@domain.com"), "domain.com", 0, 100, null);
+
         assertThat(query.start()).isEqualTo(start);
         assertThat(query.end()).isEqualTo(end);
         assertThat(query.query()).isEqualTo("test query");
@@ -120,22 +120,41 @@ class SearchQueryTest {
 
     @Test
     void constructorRejectsNegativePage() {
-        assertThatThrownBy(() -> new SearchQuery(start, end, null, null, "domain.com", -1, 100))
+        assertThatThrownBy(() -> new SearchQuery(start, end, null, null, "domain.com", -1, 100, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("page must be >= 0");
     }
 
     @Test
     void constructorRejectsZeroSize() {
-        assertThatThrownBy(() -> new SearchQuery(start, end, null, null, "domain.com", 0, 0))
+        assertThatThrownBy(() -> new SearchQuery(start, end, null, null, "domain.com", 0, 0, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("size must be > 0");
     }
 
     @Test
     void constructorRejectsNegativeSize() {
-        assertThatThrownBy(() -> new SearchQuery(start, end, null, null, "domain.com", 0, -1))
+        assertThatThrownBy(() -> new SearchQuery(start, end, null, null, "domain.com", 0, -1, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("size must be > 0");
+    }
+
+    @Test
+    void facetFieldsCanBeNull() {
+        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null);
+        assertThat(query.facetFields()).isNull();
+    }
+
+    @Test
+    void facetFieldsCanBeEmpty() {
+        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, List.of());
+        assertThat(query.facetFields()).isEmpty();
+    }
+
+    @Test
+    void facetFieldsCanContainMultipleFields() {
+        var facetFields = List.of("from_addr", "to_addr", "subject");
+        var query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, facetFields);
+        assertThat(query.facetFields()).isEqualTo(facetFields);
     }
 }

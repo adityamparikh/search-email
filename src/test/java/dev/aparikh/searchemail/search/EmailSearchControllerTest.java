@@ -38,7 +38,7 @@ class EmailSearchControllerTest {
                 "1", "Test Subject", "Test Body", "from@test.com",
                 List.of("to@test.com"), List.of(), List.of(), now
         );
-        
+
         when(emailSearchService.search(any(SearchQuery.class))).thenReturn(List.of(email));
         when(emailSearchService.getHitCount(any(SearchQuery.class))).thenReturn(1L);
 
@@ -49,12 +49,15 @@ class EmailSearchControllerTest {
                 List.of("user@test.com"),
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.emails").isArray())
@@ -81,12 +84,15 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/count")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.count").value(42));
@@ -103,12 +109,15 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidRequest)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -126,12 +135,15 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.message").value("An unexpected error occurred"));
@@ -140,7 +152,7 @@ class EmailSearchControllerTest {
     @Test
     void searchEmailsValidatesTimeRange() throws Exception {
         Instant now = Instant.parse("2025-01-01T10:00:00Z");
-        
+
         // This will trigger IllegalArgumentException from SearchQuery constructor
         when(emailSearchService.search(any(SearchQuery.class)))
                 .thenThrow(new IllegalArgumentException("end must be >= start"));
@@ -152,12 +164,15 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
                 .andExpect(jsonPath("$.message").value("end must be >= start"));
@@ -172,12 +187,15 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/count")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidRequest)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -195,12 +213,15 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
         mockMvc.perform(post("/api/emails/count")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
     }
@@ -223,7 +244,10 @@ class EmailSearchControllerTest {
                 null,
                 "test.com",
                 2, // page 2
-                10 // size 10
+                10, // size 10
+                null,
+                null,
+                null
         );
 
         mockMvc.perform(post("/api/emails/search")

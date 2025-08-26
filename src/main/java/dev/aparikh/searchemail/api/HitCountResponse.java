@@ -9,4 +9,5 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record HitCountResponse(
         @Schema(description = "Total number of matching documents", example = "42")
         long count
-) {}
+) {
+}

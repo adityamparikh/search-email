@@ -29,14 +29,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class EmailSearchServiceIT {
 
+    @Container
+    static final SolrContainer SOLR = new SolrContainer(DockerImageName.parse("solr:9.6.1"));
+    private static final String CORE = "emails";
+    @Autowired
+    private EmailSearchService searchService;
+    @Autowired
+    private EmailIndexService indexService;
+    @Autowired
+    private SolrClient solrClient;
+
     private static String solrBaseUrl() {
         return "http://" + SOLR.getHost() + ":" + SOLR.getMappedPort(8983) + "/solr";
     }
-
-    private static final String CORE = "emails";
-
-    @Container
-    static final SolrContainer SOLR = new SolrContainer(DockerImageName.parse("solr:9.6.1"));
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
@@ -48,17 +53,17 @@ class EmailSearchServiceIT {
     static void createCoreAndSchema() throws Exception {
         System.out.println("[DEBUG_LOG] Solr base URL: " + solrBaseUrl());
         System.out.println("[DEBUG_LOG] Solr core: " + CORE);
-        
+
         // Wait for Solr to be available and create the collection (Solr is running in SolrCloud mode)
         var result = SOLR.execInContainer("solr", "create_collection", "-c", CORE, "-shards", "1", "-replicationFactor", "1");
         System.out.println("[DEBUG_LOG] Core creation result: " + result.getStdout());
         if (!result.getStdout().contains("Created collection") && !result.getStdout().contains("already exists")) {
             System.out.println("[DEBUG_LOG] Core creation stderr: " + result.getStderr());
         }
-        
+
         // Wait for the core to be ready and verify it exists
         Thread.sleep(2000);
-        
+
         // Test if core is accessible
         boolean coreReady = false;
         for (int i = 0; i < 10; i++) {
@@ -74,11 +79,11 @@ class EmailSearchServiceIT {
                 Thread.sleep(1000);
             }
         }
-        
+
         if (!coreReady) {
             throw new RuntimeException("Core " + CORE + " not accessible after 10 attempts");
         }
-        
+
         // Now configure the schema
         try (SolrClient core = new HttpSolrClient.Builder(solrBaseUrl() + "/" + CORE).build()) {
             addField(core, EmailDocument.FIELD_ID, Map.of("type", "string", "stored", true, "indexed", true, "required", true));
@@ -101,15 +106,6 @@ class EmailSearchServiceIT {
             // ignore errors if field exists to keep test idempotent
         }
     }
-
-    @Autowired
-    private EmailSearchService searchService;
-    
-    @Autowired
-    private EmailIndexService indexService;
-
-    @Autowired
-    private SolrClient solrClient;
 
     @BeforeEach
     void cleanIndex() throws Exception {
@@ -134,11 +130,11 @@ class EmailSearchServiceIT {
     void bccVisibleOnlyWhenAdminFirmMatchesParticipantDomain() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
         EmailDocument bccAcme = new EmailDocument(
-                "1","s","b","sender@corp.com",
+                "1", "s", "b", "sender@corp.com",
                 List.of(), List.of(), List.of("alice@acme.com"), now
         );
         EmailDocument bccOther = new EmailDocument(
-                "2","s","b","sender@corp.com",
+                "2", "s", "b", "sender@corp.com",
                 List.of(), List.of(), List.of("bob@other.com"), now
         );
         indexService.indexAll(List.of(bccAcme, bccOther));
@@ -156,11 +152,11 @@ class EmailSearchServiceIT {
     void toAndCcAlwaysVisibleRegardlessOfAdminFirm() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
         EmailDocument toDoc = new EmailDocument(
-                "3","s","b","sender@corp.com",
+                "3", "s", "b", "sender@corp.com",
                 List.of("bob@other.com"), List.of(), List.of(), now
         );
         EmailDocument ccDoc = new EmailDocument(
-                "4","s","b","sender@corp.com",
+                "4", "s", "b", "sender@corp.com",
                 List.of(), List.of("bob@other.com"), List.of(), now
         );
         indexService.indexAll(List.of(toDoc, ccDoc));
@@ -174,7 +170,7 @@ class EmailSearchServiceIT {
     void dateRangeIsMandatoryAndFiltersResults() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
         EmailDocument d = new EmailDocument(
-                "5","s","b","sender@corp.com",
+                "5", "s", "b", "sender@corp.com",
                 List.of("x@y.com"), List.of(), List.of(), now
         );
         indexService.index(d);
@@ -304,7 +300,7 @@ class EmailSearchServiceIT {
         indexService.indexAll(List.of(urgentMeeting, regularUpdate));
 
         // Complex query combining subject and body terms
-        SearchQuery complexQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), 
+        SearchQuery complexQuery = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600),
                 "subject:Urgent AND body:important", null, "acme.com");
         List<EmailDocument> results = searchService.search(complexQuery);
         assertThat(results).extracting(EmailDocument::id).contains("14").doesNotContain("15");
@@ -355,7 +351,7 @@ class EmailSearchServiceIT {
     @Test
     void searchWithMultipleParticipantsReturnsEmailsForAny() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
-        
+
         EmailDocument emailFromAlice = new EmailDocument(
                 "20", "From Alice", "Message from Alice", "alice@acme.com",
                 List.of("team@acme.com"), List.of(), List.of(), now
@@ -376,22 +372,23 @@ class EmailSearchServiceIT {
                 "24", "Unrelated", "Message not involving searched participants", "other@corp.com",
                 List.of("different@corp.com"), List.of(), List.of(), now
         );
-        
+
         indexService.indexAll(List.of(emailFromAlice, emailToBob, emailCcCharlie, emailBccDave, unrelatedEmail));
 
         // Search for multiple participants
         SearchQuery multiQuery = new SearchQuery(
-                now.minusSeconds(3600), 
-                now.plusSeconds(3600), 
+                now.minusSeconds(3600),
+                now.plusSeconds(3600),
                 null,
                 List.of("alice@acme.com", "bob@acme.com", "charlie@acme.com", "dave@acme.com"),
                 "acme.com",
                 0,
-                100
+                100,
+                null
         );
-        
+
         List<EmailDocument> results = searchService.search(multiQuery);
-        
+
         // Should find all emails involving any of the searched participants
         assertThat(results).extracting(EmailDocument::id)
                 .containsExactlyInAnyOrder("20", "21", "22", "23")
@@ -401,6 +398,6 @@ class EmailSearchServiceIT {
     // Helper method to create SearchQuery with single participant
     private SearchQuery createSearchQuery(Instant start, Instant end, String query, String participantEmail, String adminFirmDomain) {
         List<String> participants = participantEmail != null ? List.of(participantEmail) : null;
-        return new SearchQuery(start, end, query, participants, adminFirmDomain, 0, 100);
+        return new SearchQuery(start, end, query, participants, adminFirmDomain, 0, 100, null);
     }
 }
