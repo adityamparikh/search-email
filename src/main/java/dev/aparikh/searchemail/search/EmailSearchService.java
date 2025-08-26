@@ -3,6 +3,7 @@ package dev.aparikh.searchemail.search;
 import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.FacetField;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.util.ClientUtils;
@@ -13,14 +14,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 
 @Service
 @ConditionalOnBean(SolrClient.class)
-public class EmailSearchService {
+class EmailSearchService {
 
-    private static final Logger log = LoggerFactory.getLogger(EmailSearchService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(EmailSearchService.class);
 
     private final SolrClient solr;
 
@@ -69,7 +71,7 @@ public class EmailSearchService {
             q.setRows(0); // We only want the count, no documents
             QueryResponse resp = solr.query(q);
             return resp.getResults().getNumFound();
-        } catch (Exception e) {
+        } catch (SolrServerException | IOException e) {
             throw new RuntimeException("Hit count failed", e);
         }
     }
@@ -81,7 +83,7 @@ public class EmailSearchService {
             q.setStart(query.page() * query.size());
             QueryResponse resp = solr.query(q);
             return resp.getResults().stream().map(this::fromSolrDoc).toList();
-        } catch (Exception e) {
+        } catch (SolrServerException | IOException e) {
             throw new RuntimeException("Search failed", e);
         }
     }
@@ -119,9 +121,9 @@ public class EmailSearchService {
             QueryResponse resp;
             try {
                 resp = solr.query(q);
-            } catch (Exception solrException) {
+            } catch (SolrServerException | IOException solrException) {
                 // If the query fails due to invalid facet fields, retry without faceting
-                log.warn("Faceted query failed, retrying without facets: {}", solrException.getMessage());
+                LOG.warn("Faceted query failed, retrying without facets: {}", solrException.getMessage());
                 SolrQuery fallbackQuery = buildSolrQuery(query);
                 fallbackQuery.setRows(query.size());
                 fallbackQuery.setStart(query.page() * query.size());
@@ -169,7 +171,7 @@ public class EmailSearchService {
             }
 
             return new SearchResult(emails, totalCount, query.page(), query.size(), totalPages, facets);
-        } catch (Exception e) {
+        } catch (SolrServerException | IOException e) {
             throw new RuntimeException("Search with facets failed", e);
         }
     }
@@ -190,11 +192,11 @@ public class EmailSearchService {
                                 );
                                 List<EmailDocument> results = search(pageQuery);
                                 return Flux.fromIterable(results);
-                            } catch (Exception e) {
+                            } catch (RuntimeException e) {
                                 return Flux.error(new RuntimeException("Stream batch failed for page " + page, e));
                             }
                         });
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 return Flux.error(new RuntimeException("Stream setup failed", e));
             }
         });

@@ -3,6 +3,7 @@ package dev.aparikh.searchemail.search;
 import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -237,7 +238,7 @@ class EmailSearchServiceTest {
 
     @Test
     void searchWrapsExceptionFromSolr() throws Exception {
-        when(solrClient.query(any(SolrQuery.class))).thenThrow(new RuntimeException("Solr error"));
+        when(solrClient.query(any(SolrQuery.class))).thenThrow(new SolrServerException("Solr error"));
 
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
@@ -246,7 +247,7 @@ class EmailSearchServiceTest {
         assertThatThrownBy(() -> searchService.search(query))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Search failed")
-                .hasCauseInstanceOf(RuntimeException.class);
+                .hasCauseInstanceOf(SolrServerException.class);
     }
 
     @Test

@@ -2,6 +2,7 @@ package dev.aparikh.searchemail.indexing;
 
 import dev.aparikh.searchemail.model.EmailDocument;
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.SolrInputDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,26 +136,26 @@ class EmailIndexServiceTest {
 
     @Test
     void indexWrapsExceptionFromSolr() throws Exception {
-        when(solrClient.add(any(List.class))).thenThrow(new RuntimeException("Solr error"));
+        when(solrClient.add(any(List.class))).thenThrow(new SolrServerException("Solr error"));
         
         EmailDocument email = createTestEmail();
         
         assertThatThrownBy(() -> indexService.index(email))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Failed to index emails")
-                .hasCauseInstanceOf(RuntimeException.class);
+                .hasCauseInstanceOf(SolrServerException.class);
     }
 
     @Test
     void indexWrapsExceptionFromCommit() throws Exception {
-        doThrow(new RuntimeException("Commit error")).when(solrClient).commit();
+        doThrow(new SolrServerException("Commit error")).when(solrClient).commit();
         
         EmailDocument email = createTestEmail();
         
         assertThatThrownBy(() -> indexService.index(email))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Failed to index emails")
-                .hasCauseInstanceOf(RuntimeException.class);
+                .hasCauseInstanceOf(SolrServerException.class);
     }
 
     private EmailDocument createTestEmail() {
