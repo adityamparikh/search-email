@@ -308,10 +308,10 @@ class HitCountAccuracyIT {
         System.out.println("[DEBUG_LOG] Bob search - Actual results: " + bobActualResults);
 
         // Bob is in TO field of email 1, BCC of email 5, and BCC of email 6
-        // But email 5 should NOT be visible because Bob's domain != acme.com and he's only in BCC
-        // Only email 1 should be visible (Bob in TO field)
+        // With cross-firm BCC capability, all three emails are now visible:
+        // Email 1 (Bob in TO), Email 5 (Bob in BCC), Email 6 (Bob in BCC with Alice)
         assertThat(bobCount).isEqualTo(bobSearchTotalCount);
-        assertThat(bobCount).isEqualTo(1);
+        assertThat(bobCount).isEqualTo(3);
 
         System.out.println("[DEBUG_LOG] ✅ Cross-firm BCC hit count accuracy test passed");
     }
