@@ -50,12 +50,44 @@ privacy-aware search capabilities where BCC participants are only visible to adm
 
 ### Privacy Architecture
 
-The system implements firm-based privacy controls:
+The system implements sophisticated firm-based privacy controls to prevent cross-firm information leakage:
 
-- TO/CC/FROM matches are always visible to any admin
-- BCC matches are only visible when the participant's email domain matches the admin's firm domain
-- All searches require mandatory time range filtering
-- Email addresses are normalized to lowercase for consistent matching
+#### Same-Firm Searches
+When an admin searches for employees from their own firm:
+- **Rule**: Admin can see same-firm participant in any field (FROM/TO/CC/BCC)
+- **Example**: JP Morgan admin searching for "alice@jpmorgan.com" will find all emails where Alice appears in any field
+
+#### Cross-Firm Searches  
+When an admin searches for employees from different firms, strict privacy rules apply:
+
+**✅ VISIBLE Scenarios:**
+1. **Standard Cross-Firm Visibility**
+   - Cross-firm participant in FROM/TO/CC + Admin firm has any participation
+   - Example: JP Morgan admin searching for "bob@bankofamerica.com" finds emails where:
+     - Bob is in TO field AND JP Morgan employee is in CC field
+     - Bob is in FROM field AND JP Morgan employee is in BCC field
+
+2. **Sender Privilege for BCC**
+   - Cross-firm participant in BCC + Admin firm member is the sender
+   - Example: JP Morgan admin finds Bob (BoA) in BCC when JP Morgan employee sent the email
+   - Rationale: Senders can see all BCC recipients in emails they sent
+
+**❌ HIDDEN Scenarios:**
+1. **BCC Without Sender Privilege**
+   - Cross-firm participant in BCC + Admin firm member is not the sender
+   - Example: Bob (BoA) in BCC + JP Morgan employee only in TO field → HIDDEN
+   - Prevents BCC information leakage across firms
+
+2. **No Admin Firm Participation**
+   - Cross-firm participant anywhere + No admin firm participation
+   - Example: Bob (BoA) in any field with no JP Morgan employees → HIDDEN
+   - Prevents discovery of emails where admin firm has no business involvement
+
+#### Privacy Enforcement
+- All privacy rules enforced at query time via Solr filter queries
+- Hit counts, faceting, and search results all respect privacy constraints  
+- Mandatory time range filtering for all searches
+- Email addresses normalized to lowercase for consistent matching
 
 ### Data Flow
 

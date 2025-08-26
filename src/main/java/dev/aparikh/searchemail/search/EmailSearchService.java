@@ -242,25 +242,84 @@ class EmailSearchService {
         String end = formatInstant(query.end());
         q.addFilterQuery(EmailDocument.FIELD_SENT_AT + ":[" + start + " TO " + end + "]");
 
-        // Participant filter across allowed fields
+        // Participant filter with cross-firm BCC visibility
         if (!participants.isEmpty()) {
             List<String> participantExpressions = new ArrayList<>();
 
             for (String participant : participants) {
                 String term = ClientUtils.escapeQueryChars(participant.toLowerCase(Locale.ROOT));
-                List<String> fields = new ArrayList<>();
-                fields.add(EmailDocument.FIELD_FROM);
-                fields.add(EmailDocument.FIELD_TO);
-                fields.add(EmailDocument.FIELD_CC);
-                // BCC allowed if admin firm domain is provided
-                // This allows searching for any participant in BCC when admin is from a firm
-                if (query.adminFirmDomain() != null && !query.adminFirmDomain().trim().isEmpty()) {
-                    fields.add(EmailDocument.FIELD_BCC);
+                String participantDomain = emailDomain(participant);
+                String adminDomain = query.adminFirmDomain();
+                
+                if (adminDomain != null && !adminDomain.trim().isEmpty()) {
+                    // Cross-firm scenario: admin from firm A searching for participant from firm B
+                    if (!sameDomain(participant, adminDomain)) {
+                        // PRIVACY RULE: Cross-firm searches require admin firm participation to prevent information leakage
+                        // 
+                        // Example: JP Morgan admin searching for Bank of America employee
+                        // 
+                        // VISIBLE scenarios:
+                        // 1. Cross-firm participant in FROM/TO/CC + admin firm anywhere in FROM/TO/CC/BCC
+                        //    - BoA employee in TO + JP Morgan employee in CC ✅
+                        //    - BoA employee in FROM + JP Morgan employee in BCC ✅
+                        // 
+                        // 2. Cross-firm participant in BCC + admin firm as sender (special sender privilege)
+                        //    - BoA employee in BCC + JP Morgan employee as sender ✅ (senders can see all BCCs)
+                        // 
+                        // HIDDEN scenarios:
+                        // 3. Cross-firm participant in BCC + admin firm not sender
+                        //    - BoA employee in BCC + JP Morgan employee in TO ❌ (no sender privilege)
+                        // 
+                        // 4. Cross-firm participant anywhere + no admin firm participation
+                        //    - BoA employee in FROM + no JP Morgan participation ❌ (information leakage prevention)
+                        
+                        // Case 1: Cross-firm participant in visible fields (FROM/TO/CC)
+                        List<String> visibleFields = List.of(EmailDocument.FIELD_FROM, EmailDocument.FIELD_TO, EmailDocument.FIELD_CC);
+                        String visibleParticipantExpr = String.join(" OR ", visibleFields.stream()
+                                .map(f -> f + ":\"" + term + "\"")
+                                .toList());
+                        
+                        // Admin firm can be anywhere for visible participant matches
+                        String adminFirmAnywhereExpr = String.format("(from_addr:*@%s OR to_addr:*@%s OR cc_addr:*@%s OR bcc_addr:*@%s)", 
+                                adminDomain.toLowerCase(), adminDomain.toLowerCase(), 
+                                adminDomain.toLowerCase(), adminDomain.toLowerCase());
+                        
+                        String visibleCaseExpr = "((" + visibleParticipantExpr + ") AND " + adminFirmAnywhereExpr + ")";
+                        
+                        // Case 2: Cross-firm participant in BCC + admin firm as sender
+                        String bccParticipantExpr = EmailDocument.FIELD_BCC + ":\"" + term + "\"";
+                        String adminFirmSenderExpr = "from_addr:*@" + adminDomain.toLowerCase();
+                        String bccCaseExpr = "((" + bccParticipantExpr + ") AND (" + adminFirmSenderExpr + "))";
+                        
+                        // Combine both cases
+                        participantExpressions.add("(" + visibleCaseExpr + " OR " + bccCaseExpr + ")");
+                    } else {
+                        // SAME-FIRM scenario: admin searching for participant from same firm
+                        // Example: JP Morgan admin searching for JP Morgan employee
+                        // VISIBLE: JP Morgan employee anywhere (FROM/TO/CC/BCC) ✅
+                        List<String> fields = new ArrayList<>();
+                        fields.add(EmailDocument.FIELD_FROM);
+                        fields.add(EmailDocument.FIELD_TO);
+                        fields.add(EmailDocument.FIELD_CC);
+                        fields.add(EmailDocument.FIELD_BCC); // Same firm can see BCC
+                        
+                        String participantExpr = String.join(" OR ", fields.stream()
+                                .map(f -> f + ":\"" + term + "\"")
+                                .toList());
+                        participantExpressions.add("(" + participantExpr + ")");
+                    }
+                } else {
+                    // No admin domain provided - use standard logic without BCC
+                    List<String> fields = new ArrayList<>();
+                    fields.add(EmailDocument.FIELD_FROM);
+                    fields.add(EmailDocument.FIELD_TO);
+                    fields.add(EmailDocument.FIELD_CC);
+                    
+                    String participantExpr = String.join(" OR ", fields.stream()
+                            .map(f -> f + ":\"" + term + "\"")
+                            .toList());
+                    participantExpressions.add("(" + participantExpr + ")");
                 }
-                String participantExpr = String.join(" OR ", fields.stream()
-                        .map(f -> f + ":\"" + term + "\"")
-                        .toList());
-                participantExpressions.add("(" + participantExpr + ")");
             }
 
             // Combine all participant expressions with OR

@@ -91,7 +91,7 @@ class EmailSearchServiceTest {
     }
 
     @Test
-    void searchAddsParticipantFilterWithBccEvenWhenDomainsDiffer() throws Exception {
+    void searchAddsParticipantFilterWithCrossFirmLogicWhenDomainsDiffer() throws Exception {
         setupMockResponse();
         Instant start = Instant.parse("2025-01-01T10:00:00Z");
         Instant end = Instant.parse("2025-01-01T11:00:00Z");
@@ -105,7 +105,13 @@ class EmailSearchServiceTest {
         SolrQuery solrQuery = captor.getValue();
         String[] filterQueries = solrQuery.getFilterQueries();
         assertThat(filterQueries).hasSize(2);
-        assertThat(filterQueries[1]).isEqualTo("(from_addr:\"alice@other.com\" OR to_addr:\"alice@other.com\" OR cc_addr:\"alice@other.com\" OR bcc_addr:\"alice@other.com\")");
+        // New cross-firm logic: 
+        // Case 1: Cross-firm participant in FROM/TO/CC + admin firm anywhere
+        // Case 2: Cross-firm participant in BCC + admin firm as sender
+        String visibleCaseExpr = "((from_addr:\"alice@other.com\" OR to_addr:\"alice@other.com\" OR cc_addr:\"alice@other.com\") AND (from_addr:*@domain.com OR to_addr:*@domain.com OR cc_addr:*@domain.com OR bcc_addr:*@domain.com))";
+        String bccCaseExpr = "((bcc_addr:\"alice@other.com\") AND (from_addr:*@domain.com))";
+        String expectedFilter = "(" + visibleCaseExpr + " OR " + bccCaseExpr + ")";
+        assertThat(filterQueries[1]).isEqualTo(expectedFilter);
     }
 
     @Test
@@ -284,15 +290,23 @@ class EmailSearchServiceTest {
         assertThat(filterQueries).hasSize(2);
         String participantFilter = filterQueries[1];
 
-        // Should contain all three participants with appropriate field access
+        // Should contain all three participants with appropriate logic
         assertThat(participantFilter).contains("alice@acme.com");
         assertThat(participantFilter).contains("bob@other.com");
         assertThat(participantFilter).contains("charlie@acme.com");
 
-        // Should include BCC for all participants when admin firm domain is provided
+        // Should include BCC for same-firm participants (alice@acme.com, charlie@acme.com)
         assertThat(participantFilter).contains("bcc_addr:\"alice@acme.com\"");
         assertThat(participantFilter).contains("bcc_addr:\"charlie@acme.com\"");
+        
+        // For cross-firm participant (bob@other.com), should have new two-case logic:
+        // Case 1: bob@other.com in FROM/TO/CC AND acme.com anywhere  
+        // Case 2: bob@other.com in BCC AND acme.com as sender
+        assertThat(participantFilter).contains("from_addr:\"bob@other.com\"");
+        assertThat(participantFilter).contains("to_addr:\"bob@other.com\""); 
+        assertThat(participantFilter).contains("cc_addr:\"bob@other.com\"");
         assertThat(participantFilter).contains("bcc_addr:\"bob@other.com\"");
+        assertThat(participantFilter).contains("*@acme.com");
 
         // Should combine participants with OR
         assertThat(participantFilter).contains(" OR ");

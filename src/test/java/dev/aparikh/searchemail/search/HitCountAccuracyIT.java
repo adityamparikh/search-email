@@ -307,11 +307,12 @@ class HitCountAccuracyIT {
         System.out.println("[DEBUG_LOG] Bob search - Search totalCount: " + bobSearchTotalCount);
         System.out.println("[DEBUG_LOG] Bob search - Actual results: " + bobActualResults);
 
-        // Bob is in TO field of email 1, BCC of email 5, and BCC of email 6
-        // With cross-firm BCC capability, all three emails are now visible:
-        // Email 1 (Bob in TO), Email 5 (Bob in BCC), Email 6 (Bob in BCC with Alice)
+        // Bob search from acme.com admin perspective with new privacy rules:
+        // Email 1: Bob in TO + Alice (acme.com) in FROM → VISIBLE (cross-firm + admin participation)
+        // Email 5: Bob in BCC + no acme.com participation → HIDDEN (no admin firm involvement)
+        // Email 6: Bob in BCC + Alice in BCC + sender@corp.com → HIDDEN (acme.com not sender)
         assertThat(bobCount).isEqualTo(bobSearchTotalCount);
-        assertThat(bobCount).isEqualTo(3);
+        assertThat(bobCount).isEqualTo(1); // Only email 1 should be visible
 
         System.out.println("[DEBUG_LOG] ✅ Cross-firm BCC hit count accuracy test passed");
     }

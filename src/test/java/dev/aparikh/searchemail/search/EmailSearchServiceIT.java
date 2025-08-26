@@ -127,43 +127,68 @@ class EmailSearchServiceIT {
     }
 
     @Test
-    void bccVisibleForAllParticipantsWhenAdminFirmDomainProvided() {
+    void bccVisibleForSameFirmParticipantsAndCrossFirmWithSenderPrivilege() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
+        // Same firm BCC - should be visible
         EmailDocument bccAcme = new EmailDocument(
                 "1", "s", "b", "sender@corp.com",
                 List.of(), List.of(), List.of("alice@acme.com"), now
         );
-        EmailDocument bccOther = new EmailDocument(
+        // Cross-firm BCC without admin firm participation - should be HIDDEN
+        EmailDocument bccOtherNoParticipation = new EmailDocument(
                 "2", "s", "b", "sender@corp.com",
                 List.of(), List.of(), List.of("bob@other.com"), now
         );
-        indexService.indexAll(List.of(bccAcme, bccOther));
+        // Cross-firm BCC with admin firm as sender - should be VISIBLE (sender privilege)
+        EmailDocument bccOtherWithSender = new EmailDocument(
+                "3", "s", "b", "alice@acme.com",  // Admin firm as sender
+                List.of(), List.of(), List.of("bob@other.com"), now
+        );
+        indexService.indexAll(List.of(bccAcme, bccOtherNoParticipation, bccOtherWithSender));
 
+        // Same firm search should find same-firm BCC
         SearchQuery q1 = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "alice@acme.com", "acme.com");
         List<EmailDocument> r1 = searchService.search(q1);
-        assertThat(r1).extracting(EmailDocument::id).contains("1");
+        assertThat(r1).extracting(EmailDocument::id).contains("1", "3"); // acme participant in BCC (1) and FROM (3)
 
+        // Cross-firm search should only find email with sender privilege, not the one without participation
         SearchQuery q2 = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
         List<EmailDocument> r2 = searchService.search(q2);
-        assertThat(r2).extracting(EmailDocument::id).contains("2");
+        assertThat(r2).extracting(EmailDocument::id).contains("3"); // Only sender privilege case
+        assertThat(r2).extracting(EmailDocument::id).doesNotContain("2"); // No admin firm participation
     }
 
     @Test
-    void toAndCcAlwaysVisibleRegardlessOfAdminFirm() {
+    void crossFirmToAndCcVisibleOnlyWithAdminFirmParticipation() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
-        EmailDocument toDoc = new EmailDocument(
+        // Cross-firm participant in TO, no admin firm participation - should be HIDDEN
+        EmailDocument toDocNoParticipation = new EmailDocument(
                 "3", "s", "b", "sender@corp.com",
                 List.of("bob@other.com"), List.of(), List.of(), now
         );
-        EmailDocument ccDoc = new EmailDocument(
+        // Cross-firm participant in CC, no admin firm participation - should be HIDDEN
+        EmailDocument ccDocNoParticipation = new EmailDocument(
                 "4", "s", "b", "sender@corp.com",
                 List.of(), List.of("bob@other.com"), List.of(), now
         );
-        indexService.indexAll(List.of(toDoc, ccDoc));
+        // Cross-firm participant in TO, with admin firm participation - should be VISIBLE
+        EmailDocument toDocWithParticipation = new EmailDocument(
+                "5", "s", "b", "sender@corp.com",
+                List.of("bob@other.com", "alice@acme.com"), List.of(), List.of(), now
+        );
+        // Cross-firm participant in CC, with admin firm participation - should be VISIBLE
+        EmailDocument ccDocWithParticipation = new EmailDocument(
+                "6", "s", "b", "sender@corp.com",
+                List.of("external@corp.com"), List.of("bob@other.com"), List.of("alice@acme.com"), now
+        );
+        indexService.indexAll(List.of(toDocNoParticipation, ccDocNoParticipation, toDocWithParticipation, ccDocWithParticipation));
 
         SearchQuery q = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "bob@other.com", "acme.com");
         List<EmailDocument> r = searchService.search(q);
-        assertThat(r).extracting(EmailDocument::id).contains("3", "4");
+        // Should only find emails with admin firm participation
+        assertThat(r).extracting(EmailDocument::id).containsExactlyInAnyOrder("5", "6");
+        // Should NOT find emails without admin firm participation
+        assertThat(r).extracting(EmailDocument::id).doesNotContain("3", "4");
     }
 
     @Test
