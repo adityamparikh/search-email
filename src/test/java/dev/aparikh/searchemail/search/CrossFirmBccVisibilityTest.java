@@ -265,10 +265,9 @@ class CrossFirmBccVisibilityTest {
         indexService.index(emailWithMixedBcc);
 
         // Scenario: Firm A admin searches for the Firm B participant who is in BCC
-        // IMPORTANT: Based on current implementation, this will NOT work because:
-        // The BCC field is only searchable when the participant being searched for
-        // has the same domain as the admin domain. Since bob@firmb.com has domain "firmb.com"
-        // and admin domain is "acme.com", BCC field is not included in the search.
+        // IMPORTANT: With the fixed implementation, this WILL work because:
+        // The BCC field is now searchable when admin firm domain is provided, regardless
+        // of the searched participant's domain. This allows cross-firm BCC searches.
         SearchQuery searchForFirmBParticipant = createSearchQuery(
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
@@ -284,11 +283,11 @@ class CrossFirmBccVisibilityTest {
             System.out.println("[DEBUG_LOG] Found email: " + email.id() + ", from: " + email.from() + ", bcc: " + email.bcc());
         }
 
-        // The email will NOT be found because:
-        // - BCC field is only included when searching for participants from the admin's domain
-        // - bob@firmb.com has domain "firmb.com" != "acme.com" (admin domain)
-        // - Therefore, BCC field is not searched for "bob@firmb.com"
-        assertThat(results).extracting(EmailDocument::id).doesNotContain("mixed-bcc-scenario");
+        // The email SHOULD be found because:
+        // - BCC field is now included when admin firm domain is provided
+        // - bob@firmb.com can be found in BCC when searching with admin from acme.com
+        // - The fix allows cross-firm BCC searches when admin firm is specified
+        assertThat(results).extracting(EmailDocument::id).contains("mixed-bcc-scenario");
 
         // However, if we search for the Firm A participant (alice@acme.com),
         // the email SHOULD be found because alice's domain matches admin domain
@@ -342,16 +341,16 @@ class CrossFirmBccVisibilityTest {
         List<EmailDocument> resultsOnly = searchService.search(searchForFirmBParticipantOnly);
         System.out.println("[DEBUG_LOG] Search for Firm B participant (only in BCC) found " + resultsOnly.size() + " emails");
 
-        // Should find NEITHER email because:
-        // - bob@firmb.com domain != acme.com (admin domain), so BCC field is not searched
-        // - Both emails only have bob@firmb.com in BCC, not in FROM/TO/CC fields
-        // - Therefore, both emails are invisible when searching for bob@firmb.com
-        assertThat(resultsOnly).extracting(EmailDocument::id).doesNotContain("mixed-bcc-scenario");
-        assertThat(resultsOnly).extracting(EmailDocument::id).doesNotContain("only-firmb-bcc");
+        // Should find BOTH emails because:
+        // - BCC field is now included when admin firm domain is provided (acme.com)
+        // - bob@firmb.com can be found in BCC regardless of domain mismatch
+        // - Both emails have bob@firmb.com in BCC field
+        assertThat(resultsOnly).extracting(EmailDocument::id).contains("mixed-bcc-scenario");
+        assertThat(resultsOnly).extracting(EmailDocument::id).contains("only-firmb-bcc");
 
         System.out.println("[DEBUG_LOG] ✅ Cross-firm BCC visibility test completed successfully");
         System.out.println("[DEBUG_LOG] ✅ Confirmed: Firm A admin can see Firm A participant in BCC (alice@acme.com)");
-        System.out.println("[DEBUG_LOG] ✅ Confirmed: Firm A admin cannot see Firm B participant in BCC (bob@firmb.com) even when Firm A participant is also in BCC");
-        System.out.println("[DEBUG_LOG] ✅ This demonstrates that BCC visibility is based on the searched participant's domain, not on other participants in BCC");
+        System.out.println("[DEBUG_LOG] ✅ Confirmed: Firm A admin can now see Firm B participant in BCC (bob@firmb.com) when admin firm domain is provided");
+        System.out.println("[DEBUG_LOG] ✅ This demonstrates that BCC visibility is now allowed for cross-firm searches when admin has firm domain");
     }
 }

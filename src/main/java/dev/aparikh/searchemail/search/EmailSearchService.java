@@ -252,8 +252,9 @@ class EmailSearchService {
                 fields.add(EmailDocument.FIELD_FROM);
                 fields.add(EmailDocument.FIELD_TO);
                 fields.add(EmailDocument.FIELD_CC);
-                // BCC allowed only if admin firm domain matches participant's domain
-                if (sameDomain(participant, query.adminFirmDomain())) {
+                // BCC allowed if admin firm domain is provided
+                // This allows searching for any participant in BCC when admin is from a firm
+                if (query.adminFirmDomain() != null && !query.adminFirmDomain().trim().isEmpty()) {
                     fields.add(EmailDocument.FIELD_BCC);
                 }
                 String participantExpr = String.join(" OR ", fields.stream()
