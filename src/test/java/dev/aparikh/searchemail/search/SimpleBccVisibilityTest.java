@@ -271,6 +271,46 @@ class SimpleBccVisibilityTest {
     }
 
     @Test
+    void jpMorganAdminSearchingForBoAEmployeeInBCC_WithJPMorganInCC_ShouldBeHidden() {
+        Instant baseTime = Instant.parse("2025-01-15T10:00:00Z");
+        
+        List<EmailDocument> testEmails = List.of(
+            // BoA employee in BCC + JP Morgan employee in CC (not sender) - should be HIDDEN
+            // This is the specific scenario: JP Morgan admin searching for BoA employee in BCC 
+            // when JP Morgan employee is in CC. Since JP Morgan is NOT the sender, 
+            // the cross-firm BCC should be hidden (no sender privilege).
+            new EmailDocument("bcc_with_cc_scenario", "Confidential Discussion", "Internal discussion",
+                "external@other.com",                 // FROM: External (not JP Morgan sender)
+                List.of("recipient@other.com"),       // TO: External
+                List.of("jpmorgan.employee@jpmorgan.com"), // CC: JP Morgan (not sender, no privilege)
+                List.of("boa.employee@bankofamerica.com"), // BCC: BoA (cross-firm, should be hidden)
+                baseTime)
+        );
+        
+        indexService.indexAll(testEmails);
+        
+        // JP Morgan admin searches for BoA employee
+        SearchQuery query = new SearchQuery(
+            baseTime.minusSeconds(3600), baseTime.plusSeconds(25200),
+            null, List.of("boa.employee@bankofamerica.com"), "jpmorgan.com",
+            0, 10, null, null
+        );
+        
+        List<EmailDocument> results = searchService.search(query);
+        
+        // Should be HIDDEN because:
+        // - BoA employee is in BCC (cross-firm participant in BCC)
+        // - JP Morgan employee is in CC (admin firm participation exists)
+        // - BUT JP Morgan is NOT the sender (no sender privilege)
+        // - Cross-firm BCC visibility requires sender privilege, not just participation
+        assertThat(results).hasSize(0);
+        
+        System.out.println("[DEBUG_LOG] ✅ Cross-firm BCC correctly hidden when admin firm in CC but not sender");
+        System.out.println("[DEBUG_LOG] Scenario: BoA employee in BCC + JP Morgan employee in CC + External sender");
+        System.out.println("[DEBUG_LOG] Result: Correctly hidden (no sender privilege)");
+    }
+
+    @Test
     void jpMorganAdminSearchingForBoAEmployee_HiddenInBCC_WithJPMorganNonSender() {
         Instant baseTime = Instant.parse("2025-01-15T10:00:00Z");
         
