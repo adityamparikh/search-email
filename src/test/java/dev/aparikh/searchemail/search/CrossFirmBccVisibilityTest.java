@@ -247,27 +247,29 @@ class CrossFirmBccVisibilityTest {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
 
         // Create an email where:
-        // - Sender and recipient are from Firm C (neutral third party)
-        // - BCC contains both a Firm A participant and a Firm B participant
+        // - Sender is from Firm A (giving sender privilege)
+        // - Recipient is from Firm C (neutral third party)  
+        // - BCC contains a Firm B participant
         // - Firm A admin searches for the Firm B participant
-        // - The email should be visible because a Firm A participant is also in BCC
+        // - The email should be visible because Firm A has sender privilege
         EmailDocument emailWithMixedBcc = new EmailDocument(
                 "mixed-bcc-scenario",
                 "Confidential Multi-Firm Discussion",
                 "This email involves multiple firms in BCC",
-                "sender@firmc.com",            // Firm C sender (neutral)
+                "alice@acme.com",              // Firm A sender (sender privilege)
                 List.of("recipient@firmc.com"), // Firm C recipient (neutral)
                 List.of(),                     // No CC
-                List.of("alice@acme.com", "bob@firmb.com"), // Both Firm A and Firm B in BCC
+                List.of("bob@firmb.com"),      // Firm B in BCC
                 now
         );
 
         indexService.index(emailWithMixedBcc);
 
         // Scenario: Firm A admin searches for the Firm B participant who is in BCC
-        // IMPORTANT: With the fixed implementation, this WILL work because:
-        // The BCC field is now searchable when admin firm domain is provided, regardless
-        // of the searched participant's domain. This allows cross-firm BCC searches.
+        // IMPORTANT: With the new privacy rules, this WILL work because:
+        // - Firm B participant (bob@firmb.com) is in BCC
+        // - Firm A admin has sender privilege (alice@acme.com is sender)
+        // - Sender privilege allows cross-firm BCC visibility
         SearchQuery searchForFirmBParticipant = createSearchQuery(
                 now.minusSeconds(3600),
                 now.plusSeconds(3600),
@@ -284,9 +286,9 @@ class CrossFirmBccVisibilityTest {
         }
 
         // The email SHOULD be found because:
-        // - BCC field is now included when admin firm domain is provided
-        // - bob@firmb.com can be found in BCC when searching with admin from acme.com
-        // - The fix allows cross-firm BCC searches when admin firm is specified
+        // - bob@firmb.com is in BCC (cross-firm)
+        // - alice@acme.com is the sender (admin firm has sender privilege)
+        // - Sender privilege allows visibility of cross-firm BCC participants
         assertThat(results).extracting(EmailDocument::id).contains("mixed-bcc-scenario");
 
         // However, if we search for the Firm A participant (alice@acme.com),
@@ -312,7 +314,7 @@ class CrossFirmBccVisibilityTest {
                 .orElse(null);
 
         assertThat(foundEmail).isNotNull();
-        assertThat(foundEmail.bcc()).contains("alice@acme.com", "bob@firmb.com");
+        assertThat(foundEmail.bcc()).contains("bob@firmb.com");
         System.out.println("[DEBUG_LOG] Email found with mixed BCC, participants: " + foundEmail.bcc());
 
         // Counter-test: Verify that if we remove the Firm A participant from BCC,
@@ -341,16 +343,15 @@ class CrossFirmBccVisibilityTest {
         List<EmailDocument> resultsOnly = searchService.search(searchForFirmBParticipantOnly);
         System.out.println("[DEBUG_LOG] Search for Firm B participant (only in BCC) found " + resultsOnly.size() + " emails");
 
-        // Should find BOTH emails because:
-        // - BCC field is now included when admin firm domain is provided (acme.com)
-        // - bob@firmb.com can be found in BCC regardless of domain mismatch
-        // - Both emails have bob@firmb.com in BCC field
+        // Should find ONLY "mixed-bcc-scenario" email because:
+        // - "mixed-bcc-scenario": bob@firmb.com in BCC + alice@acme.com as sender → VISIBLE (sender privilege)
+        // - "only-firmb-bcc": bob@firmb.com in BCC + sender@firmc.com + no acme.com participation → HIDDEN
         assertThat(resultsOnly).extracting(EmailDocument::id).contains("mixed-bcc-scenario");
-        assertThat(resultsOnly).extracting(EmailDocument::id).contains("only-firmb-bcc");
+        assertThat(resultsOnly).extracting(EmailDocument::id).doesNotContain("only-firmb-bcc"); // Should be hidden
 
         System.out.println("[DEBUG_LOG] ✅ Cross-firm BCC visibility test completed successfully");
-        System.out.println("[DEBUG_LOG] ✅ Confirmed: Firm A admin can see Firm A participant in BCC (alice@acme.com)");
-        System.out.println("[DEBUG_LOG] ✅ Confirmed: Firm A admin can now see Firm B participant in BCC (bob@firmb.com) when admin firm domain is provided");
-        System.out.println("[DEBUG_LOG] ✅ This demonstrates that BCC visibility is now allowed for cross-firm searches when admin has firm domain");
+        System.out.println("[DEBUG_LOG] ✅ Confirmed: Cross-firm BCC visible only with sender privilege");
+        System.out.println("[DEBUG_LOG] ✅ Confirmed: Cross-firm BCC hidden without admin firm participation");
+        System.out.println("[DEBUG_LOG] ✅ This demonstrates proper privacy enforcement in cross-firm BCC scenarios");
     }
 }

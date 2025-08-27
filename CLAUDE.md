@@ -54,12 +54,39 @@ privacy-aware search capabilities where BCC participants are only visible to adm
 
 ### Privacy Architecture
 
-The system implements firm-based privacy controls:
+The system implements firm-based privacy controls with sophisticated cross-firm access rules:
 
-- TO/CC/FROM matches are always visible to any admin
-- BCC matches are only visible when the participant's email domain matches the admin's firm domain
+#### Same-Firm Searches
+- **Rule**: Admin can see same-firm participant in any field (FROM/TO/CC/BCC)
+- **Example**: JP Morgan admin searching for JP Morgan employee finds all emails where JP Morgan employee appears anywhere
+
+#### Cross-Firm Searches
+The system enforces strict privacy rules to prevent information leakage when searching across firms:
+
+**VISIBLE Scenarios:**
+1. **Cross-firm participant in FROM/TO/CC + Admin firm participation**
+   - Bank of America employee in TO + JP Morgan employee in CC ✅
+   - Bank of America employee in FROM + JP Morgan employee in BCC ✅
+   - Requires admin firm to have any participant in the email
+
+2. **Cross-firm participant in BCC + Admin firm as sender (Sender Privilege)**  
+   - Bank of America employee in BCC + JP Morgan employee as sender ✅
+   - Special rule: senders can see all BCC recipients in emails they sent
+
+**HIDDEN Scenarios:**
+1. **Cross-firm participant in BCC + Admin firm not sender**
+   - Bank of America employee in BCC + JP Morgan employee in TO ❌
+   - Prevents BCC leakage across firms
+
+2. **Cross-firm participant anywhere + No admin firm participation**
+   - Bank of America employee in FROM + No JP Morgan participation ❌
+   - Prevents discovery of emails where admin firm has no involvement
+
+#### Technical Implementation
 - All searches require mandatory time range filtering
 - Email addresses are normalized to lowercase for consistent matching
+- Privacy rules are enforced at query time via conditional field inclusion in Solr queries
+- Hit counts, faceting, and search results all respect the same privacy constraints
 
 ### Data Flow
 
