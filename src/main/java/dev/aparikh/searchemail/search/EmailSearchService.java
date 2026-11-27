@@ -151,19 +151,12 @@ class EmailSearchService {
             
             // Process query-based facet results
             if (resp.getFacetQuery() != null && hasFacetQueries) {
-                // Create a map of query to label for easy lookup
-                Map<String, String> queryToLabel = query.facetQueries().stream()
-                        .collect(java.util.stream.Collectors.toMap(
-                                FacetQueryDefinition::query,
-                                FacetQueryDefinition::label
-                        ));
-                
-                for (Map.Entry<String, Integer> facetQueryResult : resp.getFacetQuery().entrySet()) {
-                    String facetQuery = facetQueryResult.getKey();
-                    Integer count = facetQueryResult.getValue();
-                    String label = queryToLabel.get(facetQuery);
-                    
-                    if (label != null && count != null && count > 0) {
+                // Look up each definition's count by its query. Several definitions may share a query
+                // (Solr returns one count for it), so this must not build a query -> label map.
+                for (FacetQueryDefinition facetQuery : query.facetQueries()) {
+                    Integer count = resp.getFacetQuery().get(facetQuery.query());
+                    if (count != null && count > 0) {
+                        String label = facetQuery.label();
                         List<FacetValue> values = List.of(new FacetValue(label, count.longValue()));
                         facets.put(label, new FacetResult(label, values));
                     }

@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -327,6 +328,25 @@ class EmailSearchServiceTest {
         SolrQuery solrQuery = captor.getValue();
         assertThat(solrQuery.getRows()).isEqualTo(50); // size
         assertThat(solrQuery.getStart()).isEqualTo(100); // page 2 * size 50 = start at 100
+    }
+
+    @Test
+    void searchWithFacetsReportsEveryLabelWhenFacetQueriesShareAQuery() throws Exception {
+        when(queryResponse.getResults()).thenReturn(new SolrDocumentList());
+        when(queryResponse.getFacetQuery()).thenReturn(Map.of("subject:meeting", 3));
+        when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
+
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null,
+                List.of(new FacetQueryDefinition("Meetings", "subject:meeting"),
+                        new FacetQueryDefinition("Calendar", "subject:meeting")));
+
+        SearchResult result = searchService.searchWithFacets(query);
+
+        assertThat(result.facets()).containsOnlyKeys("Meetings", "Calendar");
+        assertThat(result.facets().get("Calendar").values())
+                .containsExactly(new FacetValue("Calendar", 3));
     }
 
     private void setupMockResponse() throws Exception {
