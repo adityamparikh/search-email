@@ -220,7 +220,7 @@ class EmailSearchService {
 
     private String mapSortField(String field) {
         // Map common field aliases to actual Solr field names
-        return switch (field.toLowerCase()) {
+        return switch (field.toLowerCase(Locale.ROOT)) {
             case "timestamp" -> EmailDocument.FIELD_SENT_AT;
             default -> field;
         };
@@ -276,16 +276,17 @@ class EmailSearchService {
                                 .map(f -> f + ":\"" + term + "\"")
                                 .toList());
                         
-                        // Admin firm can be anywhere for visible participant matches
-                        String adminFirmAnywhereExpr = String.format("(from_addr:*@%s OR to_addr:*@%s OR cc_addr:*@%s OR bcc_addr:*@%s)", 
-                                adminDomain.toLowerCase(), adminDomain.toLowerCase(), 
-                                adminDomain.toLowerCase(), adminDomain.toLowerCase());
+                        // Admin firm can be anywhere for visible participant matches.
+                        // The domain comes from the request, so escape it like the participant term.
+                        String adminDomainTerm = ClientUtils.escapeQueryChars(adminDomain.toLowerCase(Locale.ROOT));
+                        String adminFirmAnywhereExpr = String.format("(from_addr:*@%s OR to_addr:*@%s OR cc_addr:*@%s OR bcc_addr:*@%s)",
+                                adminDomainTerm, adminDomainTerm, adminDomainTerm, adminDomainTerm);
                         
                         String visibleCaseExpr = "((" + visibleParticipantExpr + ") AND " + adminFirmAnywhereExpr + ")";
                         
                         // Case 2: Cross-firm participant in BCC + admin firm as sender
                         String bccParticipantExpr = EmailDocument.FIELD_BCC + ":\"" + term + "\"";
-                        String adminFirmSenderExpr = "from_addr:*@" + adminDomain.toLowerCase();
+                        String adminFirmSenderExpr = "from_addr:*@" + adminDomainTerm;
                         String bccCaseExpr = "((" + bccParticipantExpr + ") AND (" + adminFirmSenderExpr + "))";
                         
                         // Combine both cases

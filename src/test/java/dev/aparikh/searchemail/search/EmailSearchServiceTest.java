@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -330,6 +331,44 @@ class EmailSearchServiceTest {
         SolrQuery solrQuery = captor.getValue();
         assertThat(solrQuery.getRows()).isEqualTo(50); // size
         assertThat(solrQuery.getStart()).isEqualTo(100); // page 2 * size 50 = start at 100
+    }
+
+    @Test
+    void searchEscapesAdminFirmDomainInCrossFirmFilter() throws Exception {
+        setupMockResponse();
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+
+        SearchQuery query = createSearchQuery(start, end, null, "alice@other.com", "evil.com) OR (*:*");
+        searchService.search(query);
+
+        ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+        verify(solrClient).query(captor.capture());
+
+        String participantFilter = captor.getValue().getFilterQueries()[1];
+        assertThat(participantFilter)
+                .contains("from_addr:*@evil.com\\)\\ or\\ \\(\\*\\:\\*")
+                .doesNotContain("OR (*:*");
+    }
+
+    @Test
+    void searchMapsSortAliasRegardlessOfDefaultLocale() throws Exception {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+        try {
+            setupMockResponse();
+            Instant start = Instant.parse("2025-01-01T10:00:00Z");
+            Instant end = Instant.parse("2025-01-01T11:00:00Z");
+            SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null, null, "TIMESTAMP desc");
+
+            searchService.search(query);
+
+            ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+            verify(solrClient).query(captor.capture());
+            assertThat(captor.getValue().getSortField()).isEqualTo("sent_at desc");
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     @Test
