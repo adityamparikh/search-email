@@ -170,6 +170,9 @@ class EmailSearchService {
     }
 
     public Flux<EmailDocument> searchStream(SearchQuery query, int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize must be > 0");
+        }
         return Flux.defer(() -> {
             try {
                 long totalCount = getHitCount(query);
@@ -181,7 +184,8 @@ class EmailSearchService {
                                 SearchQuery pageQuery = new SearchQuery(
                                         query.start(), query.end(), query.query(),
                                         query.participantEmails(), query.adminFirmDomain(),
-                                        page, batchSize, query.facetFields(), query.facetQueries()
+                                        page, batchSize, query.facetFields(), query.facetQueries(),
+                                        query.sort()
                                 );
                                 List<EmailDocument> results = search(pageQuery);
                                 return Flux.fromIterable(results);

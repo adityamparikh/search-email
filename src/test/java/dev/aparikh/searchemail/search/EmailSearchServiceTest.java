@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.test.StepVerifier;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -347,6 +349,37 @@ class EmailSearchServiceTest {
         assertThat(result.facets()).containsOnlyKeys("Meetings", "Calendar");
         assertThat(result.facets().get("Calendar").values())
                 .containsExactly(new FacetValue("Calendar", 3));
+    }
+
+    @Test
+    void searchStreamKeepsSortForEveryBatch() throws Exception {
+        SolrDocumentList results = new SolrDocumentList();
+        results.setNumFound(1);
+        when(queryResponse.getResults()).thenReturn(results);
+        when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
+
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null, null, "timestamp desc");
+
+        StepVerifier.create(searchService.searchStream(query, 10)).verifyComplete();
+
+        ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+        verify(solrClient, times(2)).query(captor.capture());
+        SolrQuery batchQuery = captor.getAllValues().get(1);
+        assertThat(batchQuery.getRows()).isEqualTo(10);
+        assertThat(batchQuery.getSortField()).isEqualTo("sent_at desc");
+    }
+
+    @Test
+    void searchStreamRejectsNonPositiveBatchSize() {
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+        SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
+
+        assertThatThrownBy(() -> searchService.searchStream(query, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("batchSize must be > 0");
     }
 
     private void setupMockResponse() throws Exception {
