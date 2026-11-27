@@ -67,7 +67,7 @@ public record SearchQuery(
         return Optional.ofNullable(sort).filter(s -> !s.isBlank());
     }
     
-    public static class Builder {
+    public static final class Builder {
         private Instant start;
         private Instant end;
         private String query;

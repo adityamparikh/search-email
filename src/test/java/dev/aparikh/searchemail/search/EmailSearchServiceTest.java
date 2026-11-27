@@ -13,15 +13,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.test.StepVerifier;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -327,6 +331,94 @@ class EmailSearchServiceTest {
         SolrQuery solrQuery = captor.getValue();
         assertThat(solrQuery.getRows()).isEqualTo(50); // size
         assertThat(solrQuery.getStart()).isEqualTo(100); // page 2 * size 50 = start at 100
+    }
+
+    @Test
+    void searchEscapesAdminFirmDomainInCrossFirmFilter() throws Exception {
+        setupMockResponse();
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+
+        SearchQuery query = createSearchQuery(start, end, null, "alice@other.com", "evil.com) OR (*:*");
+        searchService.search(query);
+
+        ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+        verify(solrClient).query(captor.capture());
+
+        String participantFilter = captor.getValue().getFilterQueries()[1];
+        assertThat(participantFilter)
+                .contains("from_addr:*@evil.com\\)\\ or\\ \\(\\*\\:\\*")
+                .doesNotContain("OR (*:*");
+    }
+
+    @Test
+    void searchMapsSortAliasRegardlessOfDefaultLocale() throws Exception {
+        Locale original = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+        try {
+            setupMockResponse();
+            Instant start = Instant.parse("2025-01-01T10:00:00Z");
+            Instant end = Instant.parse("2025-01-01T11:00:00Z");
+            SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null, null, "TIMESTAMP desc");
+
+            searchService.search(query);
+
+            ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+            verify(solrClient).query(captor.capture());
+            assertThat(captor.getValue().getSortField()).isEqualTo("sent_at desc");
+        } finally {
+            Locale.setDefault(original);
+        }
+    }
+
+    @Test
+    void searchWithFacetsReportsEveryLabelWhenFacetQueriesShareAQuery() throws Exception {
+        when(queryResponse.getResults()).thenReturn(new SolrDocumentList());
+        when(queryResponse.getFacetQuery()).thenReturn(Map.of("subject:meeting", 3));
+        when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
+
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null,
+                List.of(new FacetQueryDefinition("Meetings", "subject:meeting"),
+                        new FacetQueryDefinition("Calendar", "subject:meeting")));
+
+        SearchResult result = searchService.searchWithFacets(query);
+
+        assertThat(result.facets()).containsOnlyKeys("Meetings", "Calendar");
+        assertThat(result.facets().get("Calendar").values())
+                .containsExactly(new FacetValue("Calendar", 3));
+    }
+
+    @Test
+    void searchStreamKeepsSortForEveryBatch() throws Exception {
+        SolrDocumentList results = new SolrDocumentList();
+        results.setNumFound(1);
+        when(queryResponse.getResults()).thenReturn(results);
+        when(solrClient.query(any(SolrQuery.class))).thenReturn(queryResponse);
+
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+        SearchQuery query = new SearchQuery(start, end, null, null, "domain.com", 0, 100, null, null, "timestamp desc");
+
+        StepVerifier.create(searchService.searchStream(query, 10)).verifyComplete();
+
+        ArgumentCaptor<SolrQuery> captor = ArgumentCaptor.forClass(SolrQuery.class);
+        verify(solrClient, times(2)).query(captor.capture());
+        SolrQuery batchQuery = captor.getAllValues().get(1);
+        assertThat(batchQuery.getRows()).isEqualTo(10);
+        assertThat(batchQuery.getSortField()).isEqualTo("sent_at desc");
+    }
+
+    @Test
+    void searchStreamRejectsNonPositiveBatchSize() {
+        Instant start = Instant.parse("2025-01-01T10:00:00Z");
+        Instant end = Instant.parse("2025-01-01T11:00:00Z");
+        SearchQuery query = createSearchQuery(start, end, null, null, "domain.com");
+
+        assertThatThrownBy(() -> searchService.searchStream(query, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("batchSize must be > 0");
     }
 
     private void setupMockResponse() throws Exception {

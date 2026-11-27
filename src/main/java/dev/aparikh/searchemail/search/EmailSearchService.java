@@ -56,13 +56,12 @@ class EmailSearchService {
     }
 
     private static String getFieldAsString(SolrDocument d, String fieldName) {
-        Object value = d.getFieldValue(fieldName);
-        if (value == null) return null;
-        if (value instanceof String) return (String) value;
-        if (value instanceof Collection<?> collection && !collection.isEmpty()) {
-            return String.valueOf(collection.iterator().next());
-        }
-        return String.valueOf(value);
+        return switch (d.getFieldValue(fieldName)) {
+            case null -> null;
+            case String s -> s;
+            case Collection<?> collection when !collection.isEmpty() -> String.valueOf(collection.iterator().next());
+            case Object value -> String.valueOf(value);
+        };
     }
 
     public long getHitCount(SearchQuery query) {
@@ -151,19 +150,12 @@ class EmailSearchService {
             
             // Process query-based facet results
             if (resp.getFacetQuery() != null && hasFacetQueries) {
-                // Create a map of query to label for easy lookup
-                Map<String, String> queryToLabel = query.facetQueries().stream()
-                        .collect(java.util.stream.Collectors.toMap(
-                                FacetQueryDefinition::query,
-                                FacetQueryDefinition::label
-                        ));
-                
-                for (Map.Entry<String, Integer> facetQueryResult : resp.getFacetQuery().entrySet()) {
-                    String facetQuery = facetQueryResult.getKey();
-                    Integer count = facetQueryResult.getValue();
-                    String label = queryToLabel.get(facetQuery);
-                    
-                    if (label != null && count != null && count > 0) {
+                // Look up each definition's count by its query. Several definitions may share a query
+                // (Solr returns one count for it), so this must not build a query -> label map.
+                for (FacetQueryDefinition facetQuery : query.facetQueries()) {
+                    Integer count = resp.getFacetQuery().get(facetQuery.query());
+                    if (count != null && count > 0) {
+                        String label = facetQuery.label();
                         List<FacetValue> values = List.of(new FacetValue(label, count.longValue()));
                         facets.put(label, new FacetResult(label, values));
                     }
@@ -177,6 +169,9 @@ class EmailSearchService {
     }
 
     public Flux<EmailDocument> searchStream(SearchQuery query, int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize must be > 0");
+        }
         return Flux.defer(() -> {
             try {
                 long totalCount = getHitCount(query);
@@ -188,7 +183,8 @@ class EmailSearchService {
                                 SearchQuery pageQuery = new SearchQuery(
                                         query.start(), query.end(), query.query(),
                                         query.participantEmails(), query.adminFirmDomain(),
-                                        page, batchSize, query.facetFields(), query.facetQueries()
+                                        page, batchSize, query.facetFields(), query.facetQueries(),
+                                        query.sort()
                                 );
                                 List<EmailDocument> results = search(pageQuery);
                                 return Flux.fromIterable(results);
@@ -202,7 +198,6 @@ class EmailSearchService {
         });
     }
 
-    @SuppressWarnings("unchecked")
     private EmailDocument fromSolrDoc(SolrDocument d) {
         String id = getFieldAsString(d, EmailDocument.FIELD_ID);
         String subject = getFieldAsString(d, EmailDocument.FIELD_SUBJECT);
@@ -211,19 +206,17 @@ class EmailSearchService {
         List<String> to = toList(d.getFieldValues(EmailDocument.FIELD_TO));
         List<String> cc = toList(d.getFieldValues(EmailDocument.FIELD_CC));
         List<String> bcc = toList(d.getFieldValues(EmailDocument.FIELD_BCC));
-        Object dateObj = d.getFieldValue(EmailDocument.FIELD_SENT_AT);
-        Instant sentAt = null;
-        if (dateObj instanceof java.util.Date) {
-            sentAt = ((java.util.Date) dateObj).toInstant();
-        } else if (dateObj instanceof String s) {
-            sentAt = Instant.parse(s);
-        }
+        Instant sentAt = switch (d.getFieldValue(EmailDocument.FIELD_SENT_AT)) {
+            case Date date -> date.toInstant();
+            case String s -> Instant.parse(s);
+            case null, default -> null;
+        };
         return new EmailDocument(id, subject, body, from, to, cc, bcc, sentAt);
     }
 
     private String mapSortField(String field) {
         // Map common field aliases to actual Solr field names
-        return switch (field.toLowerCase()) {
+        return switch (field.toLowerCase(Locale.ROOT)) {
             case "timestamp" -> EmailDocument.FIELD_SENT_AT;
             default -> field;
         };
@@ -279,16 +272,17 @@ class EmailSearchService {
                                 .map(f -> f + ":\"" + term + "\"")
                                 .toList());
                         
-                        // Admin firm can be anywhere for visible participant matches
-                        String adminFirmAnywhereExpr = String.format("(from_addr:*@%s OR to_addr:*@%s OR cc_addr:*@%s OR bcc_addr:*@%s)", 
-                                adminDomain.toLowerCase(), adminDomain.toLowerCase(), 
-                                adminDomain.toLowerCase(), adminDomain.toLowerCase());
+                        // Admin firm can be anywhere for visible participant matches.
+                        // The domain comes from the request, so escape it like the participant term.
+                        String adminDomainTerm = ClientUtils.escapeQueryChars(adminDomain.toLowerCase(Locale.ROOT));
+                        String adminFirmAnywhereExpr = String.format("(from_addr:*@%s OR to_addr:*@%s OR cc_addr:*@%s OR bcc_addr:*@%s)",
+                                adminDomainTerm, adminDomainTerm, adminDomainTerm, adminDomainTerm);
                         
                         String visibleCaseExpr = "((" + visibleParticipantExpr + ") AND " + adminFirmAnywhereExpr + ")";
                         
                         // Case 2: Cross-firm participant in BCC + admin firm as sender
                         String bccParticipantExpr = EmailDocument.FIELD_BCC + ":\"" + term + "\"";
-                        String adminFirmSenderExpr = "from_addr:*@" + adminDomain.toLowerCase();
+                        String adminFirmSenderExpr = "from_addr:*@" + adminDomainTerm;
                         String bccCaseExpr = "((" + bccParticipantExpr + ") AND (" + adminFirmSenderExpr + "))";
                         
                         // Combine both cases
@@ -328,8 +322,7 @@ class EmailSearchService {
         }
 
         // Add sorting if specified
-        if (query.sortOpt().isPresent()) {
-            String sortString = query.sortOpt().get();
+        query.sortOpt().ifPresent(sortString -> {
             String[] parts = sortString.split("\\s+");
             if (parts.length >= 2) {
                 String field = parts[0];
@@ -346,7 +339,7 @@ class EmailSearchService {
                 String mappedField = mapSortField(parts[0]);
                 q.setSort(mappedField, SolrQuery.ORDER.asc);
             }
-        }
+        });
 
         return q;
     }

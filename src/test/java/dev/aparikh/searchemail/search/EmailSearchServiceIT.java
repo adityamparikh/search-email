@@ -249,6 +249,24 @@ class EmailSearchServiceIT {
     }
 
     @Test
+    void crossFirmSearchMatchesHyphenatedAdminFirmDomain() {
+        Instant now = Instant.parse("2025-01-01T10:15:30Z");
+        EmailDocument withAdminFirm = new EmailDocument(
+                "8a", "Cross firm", "Body", "partner@other.com",
+                List.of("admin.user@my-firm.com"), List.of(), List.of(), now
+        );
+        EmailDocument withoutAdminFirm = new EmailDocument(
+                "8b", "Cross firm", "Body", "partner@other.com",
+                List.of("someone@third.com"), List.of(), List.of(), now
+        );
+        indexService.indexAll(List.of(withAdminFirm, withoutAdminFirm));
+
+        SearchQuery query = createSearchQuery(now.minusSeconds(3600), now.plusSeconds(3600), null, "partner@other.com", "my-firm.com");
+        List<EmailDocument> results = searchService.search(query);
+        assertThat(results).extracting(EmailDocument::id).contains("8a").doesNotContain("8b");
+    }
+
+    @Test
     void searchWithCaseSensitiveEmailsFindsMatches() {
         Instant now = Instant.parse("2025-01-01T10:15:30Z");
         EmailDocument emailUpperCase = new EmailDocument(
