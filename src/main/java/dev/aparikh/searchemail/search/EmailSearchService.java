@@ -56,13 +56,12 @@ class EmailSearchService {
     }
 
     private static String getFieldAsString(SolrDocument d, String fieldName) {
-        Object value = d.getFieldValue(fieldName);
-        if (value == null) return null;
-        if (value instanceof String) return (String) value;
-        if (value instanceof Collection<?> collection && !collection.isEmpty()) {
-            return String.valueOf(collection.iterator().next());
-        }
-        return String.valueOf(value);
+        return switch (d.getFieldValue(fieldName)) {
+            case null -> null;
+            case String s -> s;
+            case Collection<?> collection when !collection.isEmpty() -> String.valueOf(collection.iterator().next());
+            case Object value -> String.valueOf(value);
+        };
     }
 
     public long getHitCount(SearchQuery query) {
@@ -199,7 +198,6 @@ class EmailSearchService {
         });
     }
 
-    @SuppressWarnings("unchecked")
     private EmailDocument fromSolrDoc(SolrDocument d) {
         String id = getFieldAsString(d, EmailDocument.FIELD_ID);
         String subject = getFieldAsString(d, EmailDocument.FIELD_SUBJECT);
@@ -208,13 +206,11 @@ class EmailSearchService {
         List<String> to = toList(d.getFieldValues(EmailDocument.FIELD_TO));
         List<String> cc = toList(d.getFieldValues(EmailDocument.FIELD_CC));
         List<String> bcc = toList(d.getFieldValues(EmailDocument.FIELD_BCC));
-        Object dateObj = d.getFieldValue(EmailDocument.FIELD_SENT_AT);
-        Instant sentAt = null;
-        if (dateObj instanceof java.util.Date) {
-            sentAt = ((java.util.Date) dateObj).toInstant();
-        } else if (dateObj instanceof String s) {
-            sentAt = Instant.parse(s);
-        }
+        Instant sentAt = switch (d.getFieldValue(EmailDocument.FIELD_SENT_AT)) {
+            case Date date -> date.toInstant();
+            case String s -> Instant.parse(s);
+            case null, default -> null;
+        };
         return new EmailDocument(id, subject, body, from, to, cc, bcc, sentAt);
     }
 
@@ -326,8 +322,7 @@ class EmailSearchService {
         }
 
         // Add sorting if specified
-        if (query.sortOpt().isPresent()) {
-            String sortString = query.sortOpt().get();
+        query.sortOpt().ifPresent(sortString -> {
             String[] parts = sortString.split("\\s+");
             if (parts.length >= 2) {
                 String field = parts[0];
@@ -344,7 +339,7 @@ class EmailSearchService {
                 String mappedField = mapSortField(parts[0]);
                 q.setSort(mappedField, SolrQuery.ORDER.asc);
             }
-        }
+        });
 
         return q;
     }
